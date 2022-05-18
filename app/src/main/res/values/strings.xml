@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Lock App for Glasses</string>
+    <string name="app_description">Lock App for Glasses</string>
+    <string name="not_device_admin">Not Device Admin</string>
+    <string name="not_device_owner">Not Device Owner</string>
+</resources>
