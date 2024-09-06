@@ -3,4 +3,18 @@
     <string name="app_description">Lock App for Glasses</string>
     <string name="not_device_admin">Not Device Admin</string>
     <string name="not_device_owner">Not Device Owner</string>
+    <string name="pref_opt_app_lock">pref_opt_app_lock</string>
+    <string name="pref_opt_chrome_mode">pref_opt_chrome_mode</string>
+
+    <string name="accessibility_service_label">eSchool2go Student</string>
+    <string name="accessibility_service_description">Turn this ON to allow eSchool2go app to block restricted applications.</string>
+
+    <string-array name="website_list">
+        <item>freecodecamp</item>
+        <item>Sample Portfolio1 page</item>
+        <item>Sample Portfolio2 page</item>
+        <item>Sample Portfolio3 page</item>
+        <item>Sample Portfolio4 page</item>
+        <item>Sample Restaurant page</item>
+    </string-array>
 </resources>

@@ -1,27 +1,81 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".MainActivity"
-    android:orientation="vertical"
+    android:background="@color/grey"
     android:gravity="center"
-    android:background="@color/grey">
+    android:keepScreenOn="true"
+    android:orientation="vertical"
+    tools:context=".MainActivity">
 
-    <TextView
+    <LinearLayout
+        android:id="@+id/llTools"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+
+        <Button
+            android:id="@+id/buttonRefresh"
+            android:visibility="visible"
+            android:layout_margin="2dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Refresh" />
+        <Button
+            android:visibility="visible"
+            android:id="@+id/buttonBack"
+            android:layout_margin="2dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Back" />
+
+        <Button
+            android:id="@+id/buttonReset"
+            android:layout_margin="4dp"
+            android:layout_width="40dp"
+            android:background="@android:drawable/ic_menu_preferences"
+            android:layout_height="wrap_content"
+            android:text="" />
+
+        <Spinner
+            android:id="@+id/websiteSpinner"
+            android:visibility="gone"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:drawSelectorOnTop="true"
+            android:entries="@array/website_list" />
+
+        <ProgressBar
+            android:visibility="gone"
+            android:id="@+id/progressBar"
+            style="?android:attr/progressBarStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:visibility="gone"
+        android:id="@+id/txtView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:id="@+id/txtView"
-        android:text="Hello!"
+        android:layout_marginLeft="2dp"
         android:background="@color/purple_200"
-        android:textColor="@color/white"
-        android:textStyle="bold"
+        android:gravity="center"
+        android:padding="2dp"
+        android:text="Hello!"
         android:textAllCaps="false"
-        android:textSize="24sp"
-        android:padding="6dp"
-        android:layout_margin="6dp"
-        android:gravity="center"/>
+        android:textColor="@color/white" />
+
+
+
+    </LinearLayout>
+    <WebView
+        android:id="@+id/webView"
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
 </LinearLayout>

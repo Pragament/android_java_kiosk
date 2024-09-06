@@ -4,7 +4,7 @@
     package="com.example.lockappforglasses">
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -15,10 +15,14 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:configChanges="orientation"
+            android:screenOrientation="portrait"
             android:theme="@style/FullScreen">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <action android:name="android.intent.action.MAIN" />
             </intent-filter>
         </activity>
 
@@ -34,19 +38,17 @@
             </intent-filter>
         </receiver>
 
-        <receiver
-            android:name= ".DeviceAdmin"
-            android:description= "@string/app_description"
-            android:label= "@string/app_name"
-            android:permission= "android.permission.BIND_DEVICE_ADMIN"
+        <service
+            android:name=".AccessibilityTrackerService"
+            android:enabled="true"
+            android:label="@string/accessibility_service_label"
+            android:description="@string/accessibility_service_description"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true">
-            <meta-data
-                android:name= "android.app.device_admin"
-                android:resource= "@xml/policies" />
             <intent-filter>
-                <action android:name= "android.app.action.DEVICE_ADMIN_ENABLED"/>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
-        </receiver>
+        </service>
 
     </application>
 </manifest>
