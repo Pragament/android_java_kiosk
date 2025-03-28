@@ -41,7 +41,7 @@ import android.widget.Toast;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
-import org.adblockplus.libadblockplus.android.webview.AdblockWebView;
+// import org.adblockplus.libadblockplus.android.webview.AdblockWebView;
 
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
 
