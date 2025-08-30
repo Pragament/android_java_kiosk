@@ -1,6 +1,5 @@
 package com.example.lockappforglasses;
 
-import android.app.ActivityManager;
 import android.app.AlertDialog;
 import android.app.admin.DevicePolicyManager;
 import android.content.ActivityNotFoundException;
@@ -9,24 +8,19 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.WindowManager;
-import android.webkit.ConsoleMessage;
 import android.webkit.CookieManager;
 import android.webkit.CookieSyncManager;
-import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CompoundButton;
@@ -40,6 +34,13 @@ import android.widget.Toast;
 
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
+
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputEditText;
+import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.util.UUID;
+
 
 // import org.adblockplus.libadblockplus.android.webview.AdblockWebView;
 
@@ -165,7 +166,64 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         Spinner websiteSpinner = (Spinner) findViewById(R.id.websiteSpinner);
         websiteSpinner.setOnItemSelectedListener(this);
         view = getWindow().getDecorView();
+
+        if (savedInstanceState == null) {
+            showClassCodeDialog();
+        }
     }
+
+
+
+    private void showClassCodeDialog() {
+        View dialogLayout = View.inflate(this, R.layout.dialog_input_class_code, null);
+
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this)
+                .setView(dialogLayout)
+                .setCancelable(false)
+                .setTitle("Classroom Code")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Proceed", null);
+
+        androidx.appcompat.app.AlertDialog dialog = builder.create();
+        dialog.show();
+
+        TextInputEditText etClassCode = dialogLayout.findViewById(R.id.et_class_code);
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    String code = etClassCode.getEditableText().toString().trim();
+                    if (!code.isEmpty()) {
+                        authenticateClassCode(code, dialog, etClassCode);
+                    } else {
+                        Toast.makeText(this, "Please enter code!", Toast.LENGTH_SHORT).show();
+                    }
+                });
+        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE)
+                .setOnClickListener(v -> {
+                    finish();
+                });
+    }
+
+    private void authenticateClassCode(String code, androidx.appcompat.app.AlertDialog dialog, TextInputEditText etClassCode) {
+        FirebaseFirestore firestore = FirebaseFirestore.getInstance();
+        firestore.collection("classrooms")
+                .whereEqualTo("classCode", code)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (!querySnapshot.isEmpty()){
+                        Toast.makeText(this, "Verified", Toast.LENGTH_SHORT).show();
+                        ((MyApp) getApplicationContext()).setCurrentClassCode(code);
+                        dialog.dismiss();
+                    } else {
+                        etClassCode.setError("Invalid code");
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Something went wrong!", Toast.LENGTH_SHORT).show();
+                });
+
+    }
+
 
     @Override
     public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
@@ -229,6 +287,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .findViewById(R.id.etCurrentPassword);
         final EditText etNewPassword = (EditText) promptsView
                 .findViewById(R.id.etNewPassword);
+        final EditText etUserName = (EditText) promptsView
+                .findViewById(R.id.etUserName);
         Boolean isChromeModeEnabled = PreferenceManager.getDefaultSharedPreferences(this)
                 .getBoolean(getString(R.string.pref_opt_chrome_mode), true);
         final Switch switchChromeMode = (Switch) promptsView
@@ -264,9 +324,16 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .setNegativeButton("Save",
                         new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int id) {
+
                                 /** DO THE METHOD HERE WHEN PROCEED IS CLICKED*/
                                 String etCurrentPasswordText = (etCurrentPassword.getText()).toString();
                                 String etNewPasswordText = (etNewPassword.getText()).toString();
+                                String etUserNameText = (etUserName.getText()).toString();
+
+                                if (!etUserNameText.trim().isEmpty()) {
+                                    SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
+                                    preferences.edit().putString("userName", etUserNameText).apply();
+                                }
 
                                 /** CHECK FOR USER'S INPUT **/
                                 SharedPreferences mySharedPreferences;

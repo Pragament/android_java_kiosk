@@ -4,6 +4,9 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
@@ -11,14 +14,27 @@ import android.view.accessibility.AccessibilityEvent;
 //import com.eschool2go.studentapp.common.AppsDatabaseHelper;
 //import com.eschool2go.studentapp.common.DatabaseHelper;
 
+import androidx.annotation.NonNull;
+
+import com.example.lockappforglasses.model.UsageLog;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.firestore.CollectionReference;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FirebaseFirestore;
+
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 public class AccessibilityTrackerService extends AccessibilityService {
 
     static final String TAG = "RecorderService";
     private String current_package_id = "";
     private long current_package_start_time = 0;
+    private String lastPackage = "";
     // private AppsDatabaseHelper AppsDB;
 
     private String getEventType(AccessibilityEvent event) {
@@ -77,8 +93,147 @@ public class AccessibilityTrackerService extends AccessibilityService {
         return false;
     }
 
+    private static final Set<String> IGNORE_PACKAGES = new HashSet<>(Arrays.asList(
+            // Core Android
+            "android",
+            "com.android.systemui",
+            "com.android.settings",
+            "com.android.phone",
+            "com.android.contacts",
+            "com.android.launcher",
+            "com.android.nfc",
+            "com.android.bluetooth",
+            "com.android.providers.downloads.ui",
+            "com.android.packageinstaller",
+
+            // Google Core (background services, not “apps”)
+            "com.google.android.gms",
+            "com.google.android.gsf",
+            "com.google.android.gms.persistent",
+            "com.google.android.gsf.login",
+            "com.google.android.partnersetup",
+            "com.google.process.gapps",
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.apps.nexuslauncher",
+            "com.google.android.setupwizard",
+
+            // Samsung (OneUI)
+            "com.samsung.android.oneconnect",
+            "com.samsung.android.app.sbrowseredge",
+            "com.samsung.android.settings",
+            "com.sec.android.app.launcher",
+            "com.sec.android.app.popupcalculator",
+            "com.sec.android.daemonapp",
+            "com.sec.android.app.SecSetupWizard",
+            "com.samsung.android.knox.containeragent",
+            "com.samsung.android.knox.containercore",
+            "com.samsung.android.dialer",
+
+            // Xiaomi (MIUI)
+            "com.miui.home",
+            "com.miui.securitycenter",
+            "com.miui.securitycore",
+            "com.miui.bugreport",
+            "com.miui.cloudbackup",
+            "com.miui.cloudservice",
+            "com.miui.gallery",
+            "com.xiaomi.mipicks",
+            "com.xiaomi.finddevice",
+
+            // Huawei (EMUI)
+            "com.huawei.android.launcher",
+            "com.huawei.android.thememanager",
+            "com.huawei.android.hwouc",
+            "com.huawei.android.mirrorshare",
+            "com.huawei.systemmanager",
+            "com.huawei.android.tips",
+            "com.hicloud.android.clone",
+
+            // Oppo / Realme / OnePlus (ColorOS / OxygenOS)
+            "com.oppo.launcher",
+            "com.coloros.filemanager",
+            "com.coloros.gallery3d",
+            "com.coloros.weather2",
+            "com.coloros.healthcheck",
+            "com.heytap.cloud",
+            "com.oneplus.launcher",
+
+            // Vivo (Funtouch)
+            "com.vivo.launcher",
+            "com.bbk.launcher2",
+            "com.vivo.daemonService",
+            "com.vivo.easyshare",
+            "com.vivo.appstore",
+            "com.vivo.gallery",
+            "com.iqoo.secure",
+
+            // Miscellaneous / OEM setup
+            "com.htc.launcher",
+            "com.lge.launcher2",
+            "com.lge.launcher3",
+            "com.sonyericsson.home",
+            "com.motorola.launcher3",
+            "com.lenovo.launcher"
+    ));
+
+    private boolean shouldLogApp(CharSequence pkg) {
+        if (pkg == null) return false;
+
+        String packageName = pkg.toString().trim();
+        if (packageName.isEmpty()) return false;
+
+        if (IGNORE_PACKAGES.contains(packageName)) {
+            return false;
+        }
+
+        if (packageName.equals(lastPackage)) {
+            return false;
+        }
+
+        lastPackage = packageName;
+        return true;
+    }
+
+    private void prepareLog(String pkg){
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
+        String name = preferences.getString("userName", "Unknown");
+        String appName;
+        PackageManager pm = getPackageManager();
+        try {
+            ApplicationInfo appInfo = pm.getApplicationInfo(pkg, 0);
+            appName = (String) pm.getApplicationLabel(appInfo);
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+            appName = pkg;
+        }
+
+
+        UsageLog usageLog = new UsageLog(
+                name,
+                "Opened " + appName,
+                System.currentTimeMillis(),
+                pkg,
+                appName
+        );
+        String code = ((MyApp) getApplicationContext()).getCurrentClassCode();
+        CollectionReference usageLogsRef = FirebaseFirestore.getInstance().collection("classrooms")
+                .document(code)
+                .collection("usageLogs");
+        usageLogsRef.add(usageLog)
+                .addOnSuccessListener(documentReference -> {})
+                .addOnFailureListener(e -> {});
+    }
+
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            String packageName = String.valueOf(event.getPackageName());
+            if (shouldLogApp(packageName)) {
+                prepareLog(packageName);
+            }
+        }
+
         //Log.v(TAG, "onAccessibilityEvent");
         /*Log.v(TAG, String.format(
                 "onAccessibilityEvent: [type] %s [class] %s [package] %s [time] %s [text] %s",
