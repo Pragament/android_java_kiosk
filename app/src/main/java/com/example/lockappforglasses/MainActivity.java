@@ -8,6 +8,8 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -37,7 +39,9 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QuerySnapshot;
 
 import java.util.UUID;
 
@@ -205,23 +209,82 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
     private void authenticateClassCode(String code, androidx.appcompat.app.AlertDialog dialog, TextInputEditText etClassCode) {
+        if (!hasNetworkConnection()) {
+            showClassCodeError(etClassCode, "No internet connection");
+            return;
+        }
+
         FirebaseFirestore firestore = FirebaseFirestore.getInstance();
         firestore.collection("classrooms")
-                .whereEqualTo("classCode", code)
+                .document(code)
                 .get()
-                .addOnSuccessListener(querySnapshot -> {
-                    if (!querySnapshot.isEmpty()){
-                        Toast.makeText(this, "Verified", Toast.LENGTH_SHORT).show();
-                        ((MyApp) getApplicationContext()).setCurrentClassCode(code);
-                        dialog.dismiss();
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        onClassCodeVerified(documentSnapshot.getId(), dialog);
                     } else {
-                        etClassCode.setError("Invalid code");
+                        authenticateClassCodeField(firestore, code, dialog, etClassCode, false);
                     }
                 })
                 .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Something went wrong!", Toast.LENGTH_SHORT).show();
+                    handleClassCodeLookupFailure(etClassCode, e);
                 });
+    }
 
+    private void authenticateClassCodeField(FirebaseFirestore firestore, String code, androidx.appcompat.app.AlertDialog dialog, TextInputEditText etClassCode, boolean numericQuery) {
+        Object classCode = code;
+        if (numericQuery) {
+            try {
+                classCode = Long.parseLong(code);
+            } catch (NumberFormatException e) {
+                etClassCode.setError("Invalid code");
+                return;
+            }
+        }
+
+        firestore.collection("classrooms")
+                .whereEqualTo("classCode", classCode)
+                .get()
+                .addOnSuccessListener(querySnapshot -> handleClassCodeQueryResult(firestore, code, dialog, etClassCode, numericQuery, querySnapshot))
+                .addOnFailureListener(e -> {
+                    handleClassCodeLookupFailure(etClassCode, e);
+                });
+    }
+
+    private void handleClassCodeQueryResult(FirebaseFirestore firestore, String code, androidx.appcompat.app.AlertDialog dialog, TextInputEditText etClassCode, boolean numericQuery, QuerySnapshot querySnapshot) {
+        if (!querySnapshot.isEmpty()) {
+            DocumentSnapshot classroom = querySnapshot.getDocuments().get(0);
+            onClassCodeVerified(classroom.getId(), dialog);
+        } else if (!numericQuery && TextUtils.isDigitsOnly(code)) {
+            authenticateClassCodeField(firestore, code, dialog, etClassCode, true);
+        } else {
+            etClassCode.setError("Invalid code");
+        }
+    }
+
+    private void onClassCodeVerified(String classroomId, androidx.appcompat.app.AlertDialog dialog) {
+        Toast.makeText(this, "Verified", Toast.LENGTH_SHORT).show();
+        ((MyApp) getApplicationContext()).setCurrentClassCode(classroomId);
+        dialog.dismiss();
+    }
+
+    private boolean hasNetworkConnection() {
+        ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connectivityManager == null) {
+            return false;
+        }
+
+        NetworkInfo activeNetwork = connectivityManager.getActiveNetworkInfo();
+        return activeNetwork != null && activeNetwork.isConnected();
+    }
+
+    private void handleClassCodeLookupFailure(TextInputEditText etClassCode, Exception e) {
+        Log.w(TAG, "Unable to verify classroom code", e);
+        showClassCodeError(etClassCode, "Unable to reach server. Check internet or DNS.");
+    }
+
+    private void showClassCodeError(TextInputEditText etClassCode, String message) {
+        etClassCode.setError(message);
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
 
