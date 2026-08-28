@@ -8,6 +8,8 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
@@ -29,6 +31,7 @@ import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -56,8 +59,21 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     Boolean isAppLockEnabledLocal = true;
     Boolean isChromeModeEnabledLocal = true;
     private static final String TAG = "MainActivity";
+    private static final String CLASSROOMS_COLLECTION = "classrooms";
+    private static final String CLASS_CODE_FIELD = "classCode";
+    private static final String WHITELISTED_APPS_COLLECTION = "whitelistedApps";
     Boolean mIsKioskEnabled = false;
     WebView mWebView;
+    LinearLayout llWhitelistedApps;
+    ScrollView whitelistedAppsScrollView;
+    TextView txtWhitelistedAppsTitle;
+    Button buttonRefresh;
+    Button buttonBack;
+    ProgressBar progressBar;
+    TextView txtView;
+    LinearLayout llTools;
+    Boolean isChromeModeEnabled;
+    boolean isWhitelistedAppsExpanded = true;
 
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
@@ -67,43 +83,17 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
         setContentView(R.layout.activity_main);
 
-        Boolean isChromeModeEnabled = PreferenceManager.getDefaultSharedPreferences(this)
+        isChromeModeEnabled = PreferenceManager.getDefaultSharedPreferences(this)
                 .getBoolean(getString(R.string.pref_opt_chrome_mode), true);
-        Button buttonRefresh = (Button) findViewById(R.id.buttonRefresh);
-        Button buttonBack = (Button) findViewById(R.id.buttonBack);
-        LinearLayout llTools = findViewById(R.id.llTools);
+        buttonRefresh = (Button) findViewById(R.id.buttonRefresh);
+        buttonBack = (Button) findViewById(R.id.buttonBack);
+        llTools = findViewById(R.id.llTools);
+        llWhitelistedApps = findViewById(R.id.llWhitelistedApps);
+        whitelistedAppsScrollView = findViewById(R.id.whitelistedAppsScrollView);
+        txtWhitelistedAppsTitle = findViewById(R.id.txtWhitelistedAppsTitle);
+        txtWhitelistedAppsTitle.setOnClickListener(v -> toggleWhitelistedApps());
+        setupWebView();
         if (!isChromeModeEnabled) {
-            //AdblockWebView adblockWebView = findViewById(R.id.main_webview);
-            mWebView = findViewById(R.id.webView);
-            mWebView.setVisibility(View.VISIBLE);
-            //mWebView.setWebChromeClient(new WebChromeClient());
-            TextView txtView = findViewById(R.id.txtView);
-            txtView.setVisibility(View.VISIBLE);
-
-            ProgressBar progressBar = findViewById(R.id.progressBar);
-            progressBar.setVisibility(View.VISIBLE);
-
-            WebViewClientImpl webViewClient = new WebViewClientImpl(progressBar, txtView, this);
-            mWebView.setWebViewClient(webViewClient);
-            WebSettings webSettings = mWebView.getSettings();
-            webSettings.setJavaScriptEnabled(true);
-            webSettings.setDomStorageEnabled(true);
-            webSettings.setLoadWithOverviewMode(true);
-            webSettings.setUseWideViewPort(true);
-
-            //webSettings.setPluginState(WebSettings.PluginState.ON);
-            webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
-
-            webSettings.setBuiltInZoomControls(true);
-            webSettings.setDisplayZoomControls(false);
-            webSettings.setSupportZoom(true);
-            webSettings.setDefaultTextEncodingName("utf-8");
-
-            mWebView.loadUrl("https://www.freecodecamp.org/learn/2022/responsive-web-design/");
-            //mWebView.loadUrl("file:///android_asset/tpl_one/index.html");
-            //mWebView.loadUrl("https://codepen.io/benthedev/pen/rjZPRG?editors=1000");
-
-
             //buttonRefresh.setVisibility(View.VISIBLE);
             buttonRefresh.setOnClickListener(new View.OnClickListener() {
 
@@ -122,7 +112,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             });
         }else{
             llTools.setOrientation(LinearLayout.VERTICAL);
-            llTools.getLayoutParams().height = LinearLayout.LayoutParams.MATCH_PARENT;
             buttonRefresh.setText("Launch web browser");
             buttonRefresh.setOnClickListener(new View.OnClickListener() {
 
@@ -150,7 +139,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                 @Override
                 public void onClick(View v) {
-                    String url = "https://www.freecodecamp.org/learn/2022/responsive-web-design/";
+                    String url = "http://levelup.technikh.com/";
                     Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                     //Intent browserIntent = new Intent(Intent.ACTION_VIEW);
                     startActivity(browserIntent);
@@ -174,6 +163,30 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         if (savedInstanceState == null) {
             showClassCodeDialog();
         }
+    }
+
+    private void setupWebView() {
+        mWebView = findViewById(R.id.webView);
+        mWebView.setVisibility(View.GONE);
+        txtView = findViewById(R.id.txtView);
+        txtView.setVisibility(View.GONE);
+
+        progressBar = findViewById(R.id.progressBar);
+        progressBar.setVisibility(View.GONE);
+
+        WebViewClientImpl webViewClient = new WebViewClientImpl(progressBar, txtView, this);
+        mWebView.setWebViewClient(webViewClient);
+        WebSettings webSettings = mWebView.getSettings();
+        webSettings.setJavaScriptEnabled(true);
+        webSettings.setDomStorageEnabled(true);
+        webSettings.setLoadWithOverviewMode(true);
+        webSettings.setUseWideViewPort(true);
+
+        webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
+        webSettings.setBuiltInZoomControls(true);
+        webSettings.setDisplayZoomControls(false);
+        webSettings.setSupportZoom(true);
+        webSettings.setDefaultTextEncodingName("utf-8");
     }
 
 
@@ -209,16 +222,25 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
     private void authenticateClassCode(String code, androidx.appcompat.app.AlertDialog dialog, TextInputEditText etClassCode) {
+        Log.d(TAG, "authenticateClassCode: entered code='" + code + "', length=" + code.length());
+
         if (!hasNetworkConnection()) {
+            Log.w(TAG, "authenticateClassCode: no active network connection");
             showClassCodeError(etClassCode, "No internet connection");
             return;
         }
 
         FirebaseFirestore firestore = FirebaseFirestore.getInstance();
-        firestore.collection("classrooms")
+        Log.d(TAG, "authenticateClassCode: checking direct classroom path /" + CLASSROOMS_COLLECTION + "/" + code);
+        firestore.collection(CLASSROOMS_COLLECTION)
                 .document(code)
                 .get()
                 .addOnSuccessListener(documentSnapshot -> {
+                    Log.d(TAG, "authenticateClassCode: direct document id=" + documentSnapshot.getId()
+                            + ", exists=" + documentSnapshot.exists()
+                            + ", fromCache=" + documentSnapshot.getMetadata().isFromCache()
+                            + ", pendingWrites=" + documentSnapshot.getMetadata().hasPendingWrites()
+                            + ", data=" + documentSnapshot.getData());
                     if (documentSnapshot.exists()) {
                         onClassCodeVerified(documentSnapshot.getId(), dialog);
                     } else {
@@ -236,13 +258,17 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             try {
                 classCode = Long.parseLong(code);
             } catch (NumberFormatException e) {
+                Log.w(TAG, "authenticateClassCodeField: code is not numeric: " + code, e);
                 etClassCode.setError("Invalid code");
                 return;
             }
         }
 
-        firestore.collection("classrooms")
-                .whereEqualTo("classCode", classCode)
+        Log.d(TAG, "authenticateClassCodeField: querying /" + CLASSROOMS_COLLECTION
+                + " where " + CLASS_CODE_FIELD + " == " + classCode
+                + " (" + classCode.getClass().getSimpleName() + ")");
+        firestore.collection(CLASSROOMS_COLLECTION)
+                .whereEqualTo(CLASS_CODE_FIELD, classCode)
                 .get()
                 .addOnSuccessListener(querySnapshot -> handleClassCodeQueryResult(firestore, code, dialog, etClassCode, numericQuery, querySnapshot))
                 .addOnFailureListener(e -> {
@@ -251,20 +277,183 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
     private void handleClassCodeQueryResult(FirebaseFirestore firestore, String code, androidx.appcompat.app.AlertDialog dialog, TextInputEditText etClassCode, boolean numericQuery, QuerySnapshot querySnapshot) {
+        Log.d(TAG, "handleClassCodeQueryResult: numericQuery=" + numericQuery
+                + ", size=" + querySnapshot.size()
+                + ", fromCache=" + querySnapshot.getMetadata().isFromCache()
+                + ", pendingWrites=" + querySnapshot.getMetadata().hasPendingWrites());
+        for (DocumentSnapshot classroom : querySnapshot.getDocuments()) {
+            Log.d(TAG, "handleClassCodeQueryResult: matched classroom id=" + classroom.getId()
+                    + ", exists=" + classroom.exists()
+                    + ", data=" + classroom.getData());
+        }
+
         if (!querySnapshot.isEmpty()) {
             DocumentSnapshot classroom = querySnapshot.getDocuments().get(0);
             onClassCodeVerified(classroom.getId(), dialog);
         } else if (!numericQuery && TextUtils.isDigitsOnly(code)) {
+            Log.d(TAG, "handleClassCodeQueryResult: string query empty; retrying as numeric code");
             authenticateClassCodeField(firestore, code, dialog, etClassCode, true);
         } else {
+            Log.w(TAG, "handleClassCodeQueryResult: no classroom found for code=" + code);
             etClassCode.setError("Invalid code");
         }
     }
 
     private void onClassCodeVerified(String classroomId, androidx.appcompat.app.AlertDialog dialog) {
+        Log.i(TAG, "onClassCodeVerified: classroomId=" + classroomId);
         Toast.makeText(this, "Verified", Toast.LENGTH_SHORT).show();
         ((MyApp) getApplicationContext()).setCurrentClassCode(classroomId);
         dialog.dismiss();
+        loadWhitelistedApps(classroomId);
+    }
+
+    private void loadWhitelistedApps(String classroomId) {
+        showWebViewToolbar();
+        showWebViewContent();
+        showWhitelistedAppsMessage("Loading apps...");
+
+        String whitelistPath = "/" + CLASSROOMS_COLLECTION + "/" + classroomId + "/" + WHITELISTED_APPS_COLLECTION;
+        Log.i(TAG, "loadWhitelistedApps: querying " + whitelistPath);
+        FirebaseFirestore.getInstance()
+                .collection(CLASSROOMS_COLLECTION)
+                .document(classroomId)
+                .collection(WHITELISTED_APPS_COLLECTION)
+                .get()
+                .addOnSuccessListener(querySnapshot -> showWhitelistedApps(querySnapshot))
+                .addOnFailureListener(e -> {
+                    Log.w(TAG, "loadWhitelistedApps: unable to load whitelisted apps from " + whitelistPath, e);
+                    showWhitelistedAppsMessage("Unable to load apps. Check internet or DNS.");
+                });
+    }
+
+    private void showWhitelistedApps(QuerySnapshot querySnapshot) {
+        Log.i(TAG, "showWhitelistedApps: size=" + querySnapshot.size()
+                + ", fromCache=" + querySnapshot.getMetadata().isFromCache()
+                + ", pendingWrites=" + querySnapshot.getMetadata().hasPendingWrites());
+
+        llWhitelistedApps.removeAllViews();
+        whitelistedAppsScrollView.setVisibility(View.VISIBLE);
+        txtWhitelistedAppsTitle.setVisibility(View.VISIBLE);
+        updateWhitelistedAppsTitle();
+
+        if (querySnapshot.isEmpty()) {
+            Log.w(TAG, "showWhitelistedApps: query returned empty whitelist");
+            addWhitelistedAppsMessage("No whitelisted apps found.");
+            return;
+        }
+
+        for (DocumentSnapshot appDocument : querySnapshot.getDocuments()) {
+            Log.i(TAG, "showWhitelistedApps: whitelist package=" + appDocument.getId()
+                    + ", exists=" + appDocument.exists()
+                    + ", fromCache=" + appDocument.getMetadata().isFromCache()
+                    + ", data=" + appDocument.getData());
+            addWhitelistedAppButton(appDocument.getId());
+        }
+    }
+
+    private void showWhitelistedAppsMessage(String message) {
+        showWebViewContent();
+        whitelistedAppsScrollView.setVisibility(View.VISIBLE);
+        txtWhitelistedAppsTitle.setVisibility(View.VISIBLE);
+        updateWhitelistedAppsTitle();
+        llWhitelistedApps.removeAllViews();
+        addWhitelistedAppsMessage(message);
+    }
+
+    private void showWebViewContent() {
+        if (mWebView == null) {
+            return;
+        }
+
+        mWebView.setVisibility(View.VISIBLE);
+        if (mWebView.getUrl() == null || "about:blank".equals(mWebView.getUrl())) {
+            mWebView.loadUrl("http://levelup.technikh.com/");
+        }
+    }
+
+    private void showWebViewToolbar() {
+        llTools.setOrientation(LinearLayout.HORIZONTAL);
+        buttonRefresh.setVisibility(View.VISIBLE);
+        buttonBack.setVisibility(View.VISIBLE);
+        buttonRefresh.setText("Refresh");
+        buttonBack.setText("Back");
+
+        buttonRefresh.setOnClickListener(v -> {
+            if (mWebView != null) {
+                mWebView.reload();
+            }
+        });
+        buttonBack.setOnClickListener(v -> {
+            if (mWebView != null && mWebView.canGoBack()) {
+                mWebView.goBack();
+            }
+        });
+    }
+
+    private void toggleWhitelistedApps() {
+        isWhitelistedAppsExpanded = !isWhitelistedAppsExpanded;
+        whitelistedAppsScrollView.setVisibility(isWhitelistedAppsExpanded ? View.VISIBLE : View.GONE);
+        updateWhitelistedAppsTitle();
+    }
+
+    private void updateWhitelistedAppsTitle() {
+        txtWhitelistedAppsTitle.setText(isWhitelistedAppsExpanded ? "Whitelisted Apps [-]" : "Whitelisted Apps [+]");
+    }
+
+    private void hideWebViewStatus() {
+        if (progressBar != null) {
+            progressBar.setVisibility(View.GONE);
+        }
+        if (txtView != null) {
+            txtView.setVisibility(View.GONE);
+        }
+    }
+
+    private void addWhitelistedAppsMessage(String message) {
+        TextView textView = new TextView(this);
+        textView.setText(message);
+        textView.setTextColor(getResources().getColor(R.color.black));
+        textView.setTextSize(16);
+        textView.setPadding(0, 8, 0, 8);
+        llWhitelistedApps.addView(textView);
+    }
+
+    private void addWhitelistedAppButton(String packageName) {
+        Button button = new Button(this);
+        button.setAllCaps(false);
+        button.setText(getAppDisplayName(packageName));
+        button.setOnClickListener(v -> launchWhitelistedApp(packageName));
+
+        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        layoutParams.setMargins(0, 8, 0, 8);
+        llWhitelistedApps.addView(button, layoutParams);
+    }
+
+    private String getAppDisplayName(String packageName) {
+        PackageManager packageManager = getPackageManager();
+        try {
+            ApplicationInfo appInfo = packageManager.getApplicationInfo(packageName, 0);
+            String appName = packageManager.getApplicationLabel(appInfo).toString();
+            Log.d(TAG, "getAppDisplayName: package=" + packageName + ", label=" + appName);
+            return appName;
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "getAppDisplayName: package not installed or not visible: " + packageName, e);
+            return packageName;
+        }
+    }
+
+    private void launchWhitelistedApp(String packageName) {
+        Log.d(TAG, "launchWhitelistedApp: package=" + packageName);
+        Intent launchIntent = getPackageManager().getLaunchIntentForPackage(packageName);
+        if (launchIntent != null) {
+            startActivity(launchIntent);
+        } else {
+            Log.w(TAG, "launchWhitelistedApp: no launch intent for " + packageName);
+            Toast.makeText(this, "App not installed: " + packageName, Toast.LENGTH_SHORT).show();
+        }
     }
 
     private boolean hasNetworkConnection() {
@@ -274,7 +463,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
 
         NetworkInfo activeNetwork = connectivityManager.getActiveNetworkInfo();
-        return activeNetwork != null && activeNetwork.isConnected();
+        boolean connected = activeNetwork != null && activeNetwork.isConnected();
+        Log.d(TAG, "hasNetworkConnection: connected=" + connected
+                + ", activeNetwork=" + (activeNetwork == null ? "null" : activeNetwork.toString()));
+        return connected;
     }
 
     private void handleClassCodeLookupFailure(TextInputEditText etClassCode, Exception e) {
@@ -326,6 +518,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             Boolean isChromeModeEnabled = PreferenceManager.getDefaultSharedPreferences(this)
                     .getBoolean(getString(R.string.pref_opt_chrome_mode), true);
             if (!isChromeModeEnabled) {
+                whitelistedAppsScrollView.setVisibility(View.GONE);
+                txtWhitelistedAppsTitle.setVisibility(View.GONE);
+                if (progressBar != null) {
+                    progressBar.setVisibility(View.VISIBLE);
+                }
+                if (txtView != null) {
+                    txtView.setVisibility(View.VISIBLE);
+                }
+                mWebView.setVisibility(View.VISIBLE);
                 mWebView.loadUrl(url);
             } else {
                 Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));

@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/grey"
-    android:gravity="center"
+    android:gravity="top"
     android:keepScreenOn="true"
     android:orientation="vertical"
     tools:context=".MainActivity">
@@ -72,10 +72,42 @@
 
 
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/txtWhitelistedAppsTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/purple_200"
+        android:clickable="true"
+        android:focusable="true"
+        android:padding="16dp"
+        android:text="Whitelisted Apps [-]"
+        android:textColor="@color/black"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <ScrollView
+        android:id="@+id/whitelistedAppsScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/llWhitelistedApps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp"
+            android:paddingBottom="16dp" />
+    </ScrollView>
+
     <WebView
         android:id="@+id/webView"
         android:visibility="gone"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
 </LinearLayout>
