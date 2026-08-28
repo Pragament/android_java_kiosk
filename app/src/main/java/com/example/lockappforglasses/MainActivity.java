@@ -62,11 +62,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private static final String CLASSROOMS_COLLECTION = "classrooms";
     private static final String CLASS_CODE_FIELD = "classCode";
     private static final String WHITELISTED_APPS_COLLECTION = "whitelistedApps";
+    private static final String WHITELISTED_WEBSITES_COLLECTION = "whitelistedWebsites";
     Boolean mIsKioskEnabled = false;
     WebView mWebView;
     LinearLayout llWhitelistedApps;
+    LinearLayout llWhitelistedWebsites;
     ScrollView whitelistedAppsScrollView;
+    ScrollView whitelistedWebsitesScrollView;
     TextView txtWhitelistedAppsTitle;
+    TextView txtWhitelistedWebsitesTitle;
     Button buttonRefresh;
     Button buttonBack;
     ProgressBar progressBar;
@@ -74,6 +78,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     LinearLayout llTools;
     Boolean isChromeModeEnabled;
     boolean isWhitelistedAppsExpanded = true;
+    boolean isWhitelistedWebsitesExpanded = true;
 
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
@@ -89,9 +94,13 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         buttonBack = (Button) findViewById(R.id.buttonBack);
         llTools = findViewById(R.id.llTools);
         llWhitelistedApps = findViewById(R.id.llWhitelistedApps);
+        llWhitelistedWebsites = findViewById(R.id.llWhitelistedWebsites);
         whitelistedAppsScrollView = findViewById(R.id.whitelistedAppsScrollView);
+        whitelistedWebsitesScrollView = findViewById(R.id.whitelistedWebsitesScrollView);
         txtWhitelistedAppsTitle = findViewById(R.id.txtWhitelistedAppsTitle);
+        txtWhitelistedWebsitesTitle = findViewById(R.id.txtWhitelistedWebsitesTitle);
         txtWhitelistedAppsTitle.setOnClickListener(v -> toggleWhitelistedApps());
+        txtWhitelistedWebsitesTitle.setOnClickListener(v -> toggleWhitelistedWebsites());
         setupWebView();
         if (!isChromeModeEnabled) {
             //buttonRefresh.setVisibility(View.VISIBLE);
@@ -311,6 +320,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         showWebViewToolbar();
         showWebViewContent();
         showWhitelistedAppsMessage("Loading apps...");
+        showWhitelistedWebsitesMessage("Loading websites...");
 
         String whitelistPath = "/" + CLASSROOMS_COLLECTION + "/" + classroomId + "/" + WHITELISTED_APPS_COLLECTION;
         Log.i(TAG, "loadWhitelistedApps: querying " + whitelistPath);
@@ -323,6 +333,22 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .addOnFailureListener(e -> {
                     Log.w(TAG, "loadWhitelistedApps: unable to load whitelisted apps from " + whitelistPath, e);
                     showWhitelistedAppsMessage("Unable to load apps. Check internet or DNS.");
+                });
+        loadWhitelistedWebsites(classroomId);
+    }
+
+    private void loadWhitelistedWebsites(String classroomId) {
+        String whitelistPath = "/" + CLASSROOMS_COLLECTION + "/" + classroomId + "/" + WHITELISTED_WEBSITES_COLLECTION;
+        Log.i(TAG, "loadWhitelistedWebsites: querying " + whitelistPath);
+        FirebaseFirestore.getInstance()
+                .collection(CLASSROOMS_COLLECTION)
+                .document(classroomId)
+                .collection(WHITELISTED_WEBSITES_COLLECTION)
+                .get()
+                .addOnSuccessListener(querySnapshot -> showWhitelistedWebsites(querySnapshot))
+                .addOnFailureListener(e -> {
+                    Log.w(TAG, "loadWhitelistedWebsites: unable to load whitelisted websites from " + whitelistPath, e);
+                    showWhitelistedWebsitesMessage("Unable to load websites. Check internet or DNS.");
                 });
     }
 
@@ -358,6 +384,45 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         updateWhitelistedAppsTitle();
         llWhitelistedApps.removeAllViews();
         addWhitelistedAppsMessage(message);
+    }
+
+    private void showWhitelistedWebsites(QuerySnapshot querySnapshot) {
+        Log.i(TAG, "showWhitelistedWebsites: size=" + querySnapshot.size()
+                + ", fromCache=" + querySnapshot.getMetadata().isFromCache()
+                + ", pendingWrites=" + querySnapshot.getMetadata().hasPendingWrites());
+
+        llWhitelistedWebsites.removeAllViews();
+        whitelistedWebsitesScrollView.setVisibility(View.VISIBLE);
+        txtWhitelistedWebsitesTitle.setVisibility(View.VISIBLE);
+        updateWhitelistedWebsitesTitle();
+
+        if (querySnapshot.isEmpty()) {
+            Log.w(TAG, "showWhitelistedWebsites: query returned empty whitelist");
+            addWhitelistedWebsitesMessage("No whitelisted websites found.");
+            return;
+        }
+
+        for (DocumentSnapshot websiteDocument : querySnapshot.getDocuments()) {
+            String url = websiteDocument.getString("url");
+            String title = websiteDocument.getString("title");
+            String host = websiteDocument.getString("host");
+            Log.i(TAG, "showWhitelistedWebsites: website id=" + websiteDocument.getId()
+                    + ", url=" + url
+                    + ", title=" + title
+                    + ", host=" + host
+                    + ", fromCache=" + websiteDocument.getMetadata().isFromCache()
+                    + ", data=" + websiteDocument.getData());
+            addWhitelistedWebsiteButton(websiteDocument.getId(), title, host, url);
+        }
+    }
+
+    private void showWhitelistedWebsitesMessage(String message) {
+        showWebViewContent();
+        whitelistedWebsitesScrollView.setVisibility(View.VISIBLE);
+        txtWhitelistedWebsitesTitle.setVisibility(View.VISIBLE);
+        updateWhitelistedWebsitesTitle();
+        llWhitelistedWebsites.removeAllViews();
+        addWhitelistedWebsitesMessage(message);
     }
 
     private void showWebViewContent() {
@@ -396,8 +461,18 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         updateWhitelistedAppsTitle();
     }
 
+    private void toggleWhitelistedWebsites() {
+        isWhitelistedWebsitesExpanded = !isWhitelistedWebsitesExpanded;
+        whitelistedWebsitesScrollView.setVisibility(isWhitelistedWebsitesExpanded ? View.VISIBLE : View.GONE);
+        updateWhitelistedWebsitesTitle();
+    }
+
     private void updateWhitelistedAppsTitle() {
         txtWhitelistedAppsTitle.setText(isWhitelistedAppsExpanded ? "Whitelisted Apps [-]" : "Whitelisted Apps [+]");
+    }
+
+    private void updateWhitelistedWebsitesTitle() {
+        txtWhitelistedWebsitesTitle.setText(isWhitelistedWebsitesExpanded ? "Whitelisted Websites [-]" : "Whitelisted Websites [+]");
     }
 
     private void hideWebViewStatus() {
@@ -418,6 +493,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         llWhitelistedApps.addView(textView);
     }
 
+    private void addWhitelistedWebsitesMessage(String message) {
+        TextView textView = new TextView(this);
+        textView.setText(message);
+        textView.setTextColor(getResources().getColor(R.color.black));
+        textView.setTextSize(16);
+        textView.setPadding(0, 8, 0, 8);
+        llWhitelistedWebsites.addView(textView);
+    }
+
     private void addWhitelistedAppButton(String packageName) {
         Button button = new Button(this);
         button.setAllCaps(false);
@@ -430,6 +514,54 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         );
         layoutParams.setMargins(0, 8, 0, 8);
         llWhitelistedApps.addView(button, layoutParams);
+    }
+
+    private void addWhitelistedWebsiteButton(String documentId, String title, String host, String url) {
+        String websiteUrl = getWebsiteUrl(documentId, host, url);
+        String buttonText = getWebsiteDisplayName(documentId, title, host, websiteUrl);
+
+        Button button = new Button(this);
+        button.setAllCaps(false);
+        button.setText(buttonText);
+        button.setOnClickListener(v -> openWhitelistedWebsite(websiteUrl));
+
+        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        layoutParams.setMargins(0, 8, 0, 8);
+        llWhitelistedWebsites.addView(button, layoutParams);
+    }
+
+    private String getWebsiteUrl(String documentId, String host, String url) {
+        if (!TextUtils.isEmpty(url)) {
+            return url;
+        }
+
+        String websiteHost = !TextUtils.isEmpty(host) ? host : documentId;
+        if (websiteHost.startsWith("http://") || websiteHost.startsWith("https://")) {
+            return websiteHost;
+        }
+        return "http://" + websiteHost;
+    }
+
+    private String getWebsiteDisplayName(String documentId, String title, String host, String url) {
+        if (!TextUtils.isEmpty(title)) {
+            return title;
+        }
+        if (!TextUtils.isEmpty(host)) {
+            return host;
+        }
+        if (!TextUtils.isEmpty(url)) {
+            return url;
+        }
+        return documentId;
+    }
+
+    private void openWhitelistedWebsite(String url) {
+        Log.i(TAG, "openWhitelistedWebsite: url=" + url);
+        showWebViewContent();
+        mWebView.loadUrl(url);
     }
 
     private String getAppDisplayName(String packageName) {

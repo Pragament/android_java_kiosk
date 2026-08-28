@@ -103,6 +103,36 @@
             android:paddingBottom="16dp" />
     </ScrollView>
 
+    <TextView
+        android:id="@+id/txtWhitelistedWebsitesTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/teal_200"
+        android:clickable="true"
+        android:focusable="true"
+        android:padding="16dp"
+        android:text="Whitelisted Websites [-]"
+        android:textColor="@color/black"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <ScrollView
+        android:id="@+id/whitelistedWebsitesScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/llWhitelistedWebsites"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp"
+            android:paddingBottom="16dp" />
+    </ScrollView>
+
     <WebView
         android:id="@+id/webView"
         android:visibility="gone"
