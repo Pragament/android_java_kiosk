@@ -24,6 +24,7 @@ import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.CookieSyncManager;
 import android.webkit.WebSettings;
+import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.widget.AdapterView;
 import android.widget.Button;
@@ -185,9 +186,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         WebViewClientImpl webViewClient = new WebViewClientImpl(progressBar, txtView, this);
         mWebView.setWebViewClient(webViewClient);
+        mWebView.setWebChromeClient(new WebChromeClient());
         WebSettings webSettings = mWebView.getSettings();
         webSettings.setJavaScriptEnabled(true);
         webSettings.setDomStorageEnabled(true);
+        webSettings.setDatabaseEnabled(true);
+        webSettings.setAllowFileAccess(true);
+        webSettings.setAllowContentAccess(true);
+        webSettings.setMediaPlaybackRequiresUserGesture(false);
         webSettings.setLoadWithOverviewMode(true);
         webSettings.setUseWideViewPort(true);
 
@@ -196,6 +202,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         webSettings.setDisplayZoomControls(false);
         webSettings.setSupportZoom(true);
         webSettings.setDefaultTextEncodingName("utf-8");
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        }
     }
 
 
