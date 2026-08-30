@@ -5,11 +5,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.net.http.SslError;
 import android.net.Uri;
 import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
+import android.webkit.SslErrorHandler;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ProgressBar;
@@ -42,6 +44,13 @@ public class WebViewClientImpl extends WebViewClient {
     @Override
     public void onReceivedError(WebView view, int errorCode, String      description, String failingUrl) {
         //Toast.makeText(activity, "Oh no! " + description,      Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+        Log.w(TAG, "onReceivedSslError: proceeding for url=" + error.getUrl()
+                + ", primaryError=" + error.getPrimaryError());
+        handler.proceed();
     }
 
     @Override
