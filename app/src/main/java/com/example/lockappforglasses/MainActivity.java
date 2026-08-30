@@ -176,7 +176,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     private void setupWebView() {
         mWebView = findViewById(R.id.webView);
-        mWebView.setVisibility(View.GONE);
+        mWebView.setVisibility(View.VISIBLE);
         txtView = findViewById(R.id.txtView);
         txtView.setVisibility(View.GONE);
 
