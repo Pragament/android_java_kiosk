@@ -62,6 +62,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private static final String TAG = "MainActivity";
     private static final String CLASSROOMS_COLLECTION = "classrooms";
     private static final String CLASS_CODE_FIELD = "classCode";
+    private static final String CLASS_SECTIONS_COLLECTION = "classSections";
+    private static final String SECTION_ID_FIELD = "sectionId";
+    private static final String STUDENTS_COLLECTION = "students";
+    private static final String ADMISSION_NO_FIELD = "admissionNo";
+    private static final String PHONE_FIELD = "phone";
     private static final String WHITELISTED_APPS_COLLECTION = "whitelistedApps";
     private static final String WHITELISTED_WEBSITES_COLLECTION = "whitelistedWebsites";
     Boolean mIsKioskEnabled = false;
@@ -224,14 +229,47 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         dialog.show();
 
         TextInputEditText etClassCode = dialogLayout.findViewById(R.id.et_class_code);
+        TextInputEditText etAdmissionNo = dialogLayout.findViewById(R.id.et_admission_no);
+        TextInputEditText etPhone = dialogLayout.findViewById(R.id.et_phone);
+        TextView tvPhoneHint = dialogLayout.findViewById(R.id.tv_phone_hint);
+
+        etAdmissionNo.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) {
+                String code = getTrimmedText(etClassCode);
+                String admissionNo = getTrimmedText(etAdmissionNo);
+                if (!code.isEmpty() && !admissionNo.isEmpty()) {
+                    showStudentPhoneHint(code, admissionNo, etClassCode, etAdmissionNo, tvPhoneHint);
+                }
+            }
+        });
+
+        etPhone.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                String code = getTrimmedText(etClassCode);
+                String admissionNo = getTrimmedText(etAdmissionNo);
+                if (!code.isEmpty() && !admissionNo.isEmpty()) {
+                    showStudentPhoneHint(code, admissionNo, etClassCode, etAdmissionNo, tvPhoneHint);
+                }
+            }
+        });
 
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setOnClickListener(v -> {
-                    String code = etClassCode.getEditableText().toString().trim();
-                    if (!code.isEmpty()) {
-                        authenticateClassCode(code, dialog, etClassCode);
-                    } else {
+                    String code = getTrimmedText(etClassCode);
+                    String admissionNo = getTrimmedText(etAdmissionNo);
+                    String phone = getTrimmedText(etPhone);
+                    if (code.isEmpty()) {
                         Toast.makeText(this, "Please enter code!", Toast.LENGTH_SHORT).show();
+                        etClassCode.setError("Required");
+                    } else if (admissionNo.isEmpty()) {
+                        Toast.makeText(this, "Please enter admission number!", Toast.LENGTH_SHORT).show();
+                        etAdmissionNo.setError("Required");
+                    } else if (phone.isEmpty()) {
+                        Toast.makeText(this, "Please enter phone number!", Toast.LENGTH_SHORT).show();
+                        etPhone.setError("Required");
+                        showStudentPhoneHint(code, admissionNo, etClassCode, etAdmissionNo, tvPhoneHint);
+                    } else {
+                        authenticateClassCode(code, admissionNo, phone, dialog, etClassCode, etAdmissionNo, etPhone, tvPhoneHint);
                     }
                 });
         dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE)
@@ -240,7 +278,22 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 });
     }
 
-    private void authenticateClassCode(String code, androidx.appcompat.app.AlertDialog dialog, TextInputEditText etClassCode) {
+    private String getTrimmedText(TextInputEditText editText) {
+        if (editText.getEditableText() == null) {
+            return "";
+        }
+        return editText.getEditableText().toString().trim();
+    }
+
+    private void authenticateClassCode(
+            String code,
+            String admissionNo,
+            String phone,
+            androidx.appcompat.app.AlertDialog dialog,
+            TextInputEditText etClassCode,
+            TextInputEditText etAdmissionNo,
+            TextInputEditText etPhone,
+            TextView tvPhoneHint) {
         Log.d(TAG, "authenticateClassCode: entered code='" + code + "', length=" + code.length());
 
         if (!hasNetworkConnection()) {
@@ -261,9 +314,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                             + ", pendingWrites=" + documentSnapshot.getMetadata().hasPendingWrites()
                             + ", data=" + documentSnapshot.getData());
                     if (documentSnapshot.exists()) {
-                        onClassCodeVerified(documentSnapshot.getId(), dialog);
+                        authenticateStudent(documentSnapshot, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint);
                     } else {
-                        authenticateClassCodeField(firestore, code, dialog, etClassCode, false);
+                        authenticateClassCodeField(firestore, code, admissionNo, phone, dialog, etClassCode, etAdmissionNo, etPhone, tvPhoneHint, false);
                     }
                 })
                 .addOnFailureListener(e -> {
@@ -271,7 +324,17 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 });
     }
 
-    private void authenticateClassCodeField(FirebaseFirestore firestore, String code, androidx.appcompat.app.AlertDialog dialog, TextInputEditText etClassCode, boolean numericQuery) {
+    private void authenticateClassCodeField(
+            FirebaseFirestore firestore,
+            String code,
+            String admissionNo,
+            String phone,
+            androidx.appcompat.app.AlertDialog dialog,
+            TextInputEditText etClassCode,
+            TextInputEditText etAdmissionNo,
+            TextInputEditText etPhone,
+            TextView tvPhoneHint,
+            boolean numericQuery) {
         Object classCode = code;
         if (numericQuery) {
             try {
@@ -289,13 +352,35 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         firestore.collection(CLASSROOMS_COLLECTION)
                 .whereEqualTo(CLASS_CODE_FIELD, classCode)
                 .get()
-                .addOnSuccessListener(querySnapshot -> handleClassCodeQueryResult(firestore, code, dialog, etClassCode, numericQuery, querySnapshot))
+                .addOnSuccessListener(querySnapshot -> handleClassCodeQueryResult(
+                        firestore,
+                        code,
+                        admissionNo,
+                        phone,
+                        dialog,
+                        etClassCode,
+                        etAdmissionNo,
+                        etPhone,
+                        tvPhoneHint,
+                        numericQuery,
+                        querySnapshot))
                 .addOnFailureListener(e -> {
                     handleClassCodeLookupFailure(etClassCode, e);
                 });
     }
 
-    private void handleClassCodeQueryResult(FirebaseFirestore firestore, String code, androidx.appcompat.app.AlertDialog dialog, TextInputEditText etClassCode, boolean numericQuery, QuerySnapshot querySnapshot) {
+    private void handleClassCodeQueryResult(
+            FirebaseFirestore firestore,
+            String code,
+            String admissionNo,
+            String phone,
+            androidx.appcompat.app.AlertDialog dialog,
+            TextInputEditText etClassCode,
+            TextInputEditText etAdmissionNo,
+            TextInputEditText etPhone,
+            TextView tvPhoneHint,
+            boolean numericQuery,
+            QuerySnapshot querySnapshot) {
         Log.d(TAG, "handleClassCodeQueryResult: numericQuery=" + numericQuery
                 + ", size=" + querySnapshot.size()
                 + ", fromCache=" + querySnapshot.getMetadata().isFromCache()
@@ -308,14 +393,261 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         if (!querySnapshot.isEmpty()) {
             DocumentSnapshot classroom = querySnapshot.getDocuments().get(0);
-            onClassCodeVerified(classroom.getId(), dialog);
+            authenticateStudent(classroom, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint);
         } else if (!numericQuery && TextUtils.isDigitsOnly(code)) {
             Log.d(TAG, "handleClassCodeQueryResult: string query empty; retrying as numeric code");
-            authenticateClassCodeField(firestore, code, dialog, etClassCode, true);
+            authenticateClassCodeField(firestore, code, admissionNo, phone, dialog, etClassCode, etAdmissionNo, etPhone, tvPhoneHint, true);
         } else {
             Log.w(TAG, "handleClassCodeQueryResult: no classroom found for code=" + code);
             etClassCode.setError("Invalid code");
         }
+    }
+
+    private void authenticateStudent(
+            DocumentSnapshot classroom,
+            String admissionNo,
+            String phone,
+            androidx.appcompat.app.AlertDialog dialog,
+            TextInputEditText etAdmissionNo,
+            TextInputEditText etPhone,
+            TextView tvPhoneHint) {
+        String classroomId = classroom.getId();
+        String sectionId = classroom.getString(SECTION_ID_FIELD);
+        if (TextUtils.isEmpty(sectionId)) {
+            Log.w(TAG, "authenticateStudent: classroom has no sectionId, classroomId=" + classroomId);
+            etAdmissionNo.setError("Unable to verify student section");
+            return;
+        }
+
+        Log.d(TAG, "authenticateStudent: checking /" + CLASS_SECTIONS_COLLECTION + "/" + sectionId
+                + "/" + STUDENTS_COLLECTION + "/" + admissionNo);
+        FirebaseFirestore.getInstance()
+                .collection(CLASS_SECTIONS_COLLECTION)
+                .document(sectionId)
+                .collection(STUDENTS_COLLECTION)
+                .document(admissionNo)
+                .get()
+                .addOnSuccessListener(student -> {
+                    if (student.exists()) {
+                        verifyStudentPhone(classroomId, student, phone, dialog, etPhone, tvPhoneHint);
+                    } else {
+                        authenticateStudentByAdmissionField(classroomId, sectionId, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, false);
+                    }
+                })
+                .addOnFailureListener(e -> handleStudentLookupFailure(etAdmissionNo, e));
+    }
+
+    private void authenticateStudentByAdmissionField(
+            String classroomId,
+            String sectionId,
+            String admissionNo,
+            String phone,
+            androidx.appcompat.app.AlertDialog dialog,
+            TextInputEditText etAdmissionNo,
+            TextInputEditText etPhone,
+            TextView tvPhoneHint,
+            boolean numericQuery) {
+        Object admissionValue = admissionNo;
+        if (numericQuery) {
+            try {
+                admissionValue = Long.parseLong(admissionNo);
+            } catch (NumberFormatException e) {
+                Log.w(TAG, "authenticateStudentByAdmissionField: admission number is not numeric: " + admissionNo, e);
+                etAdmissionNo.setError("Invalid admission number");
+                return;
+            }
+        }
+
+        FirebaseFirestore.getInstance()
+                .collection(CLASS_SECTIONS_COLLECTION)
+                .document(sectionId)
+                .collection(STUDENTS_COLLECTION)
+                .whereEqualTo(ADMISSION_NO_FIELD, admissionValue)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (!querySnapshot.isEmpty()) {
+                        verifyStudentPhone(classroomId, querySnapshot.getDocuments().get(0), phone, dialog, etPhone, tvPhoneHint);
+                    } else if (!numericQuery && TextUtils.isDigitsOnly(admissionNo)) {
+                        authenticateStudentByAdmissionField(classroomId, sectionId, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, true);
+                    } else {
+                        Log.w(TAG, "authenticateStudentByAdmissionField: no student found for admissionNo=" + admissionNo);
+                        etAdmissionNo.setError("Invalid admission number");
+                    }
+                })
+                .addOnFailureListener(e -> handleStudentLookupFailure(etAdmissionNo, e));
+    }
+
+    private void verifyStudentPhone(
+            String classroomId,
+            DocumentSnapshot student,
+            String phone,
+            androidx.appcompat.app.AlertDialog dialog,
+            TextInputEditText etPhone,
+            TextView tvPhoneHint) {
+        String registeredPhone = normalizePhone(student.getString(PHONE_FIELD));
+        String enteredPhone = normalizePhone(phone);
+        showPhoneSuffixHint(registeredPhone, tvPhoneHint);
+
+        if (TextUtils.isEmpty(registeredPhone) || !registeredPhone.equals(enteredPhone)) {
+            Log.w(TAG, "verifyStudentPhone: phone mismatch for student=" + student.getId());
+            etPhone.setError("Phone number does not match");
+            Toast.makeText(this, "Phone number does not match", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Log.i(TAG, "verifyStudentPhone: verified classroomId=" + classroomId + ", student=" + student.getId());
+        onClassCodeVerified(classroomId, dialog);
+    }
+
+    private void showStudentPhoneHint(
+            String code,
+            String admissionNo,
+            TextInputEditText etClassCode,
+            TextInputEditText etAdmissionNo,
+            TextView tvPhoneHint) {
+        if (!hasNetworkConnection()) {
+            showClassCodeError(etClassCode, "No internet connection");
+            return;
+        }
+
+        tvPhoneHint.setText("Checking registered phone...");
+        tvPhoneHint.setVisibility(View.VISIBLE);
+
+        FirebaseFirestore firestore = FirebaseFirestore.getInstance();
+        firestore.collection(CLASSROOMS_COLLECTION)
+                .document(code)
+                .get()
+                .addOnSuccessListener(classroom -> {
+                    if (classroom.exists()) {
+                        showStudentPhoneHintForClassroom(classroom, admissionNo, etAdmissionNo, tvPhoneHint);
+                    } else {
+                        showStudentPhoneHintByClassCodeField(firestore, code, admissionNo, etClassCode, etAdmissionNo, tvPhoneHint, false);
+                    }
+                })
+                .addOnFailureListener(e -> handleClassCodeLookupFailure(etClassCode, e));
+    }
+
+    private void showStudentPhoneHintByClassCodeField(
+            FirebaseFirestore firestore,
+            String code,
+            String admissionNo,
+            TextInputEditText etClassCode,
+            TextInputEditText etAdmissionNo,
+            TextView tvPhoneHint,
+            boolean numericQuery) {
+        Object classCode = code;
+        if (numericQuery) {
+            try {
+                classCode = Long.parseLong(code);
+            } catch (NumberFormatException e) {
+                etClassCode.setError("Invalid code");
+                tvPhoneHint.setVisibility(View.GONE);
+                return;
+            }
+        }
+
+        firestore.collection(CLASSROOMS_COLLECTION)
+                .whereEqualTo(CLASS_CODE_FIELD, classCode)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (!querySnapshot.isEmpty()) {
+                        showStudentPhoneHintForClassroom(querySnapshot.getDocuments().get(0), admissionNo, etAdmissionNo, tvPhoneHint);
+                    } else if (!numericQuery && TextUtils.isDigitsOnly(code)) {
+                        showStudentPhoneHintByClassCodeField(firestore, code, admissionNo, etClassCode, etAdmissionNo, tvPhoneHint, true);
+                    } else {
+                        etClassCode.setError("Invalid code");
+                        tvPhoneHint.setVisibility(View.GONE);
+                    }
+                })
+                .addOnFailureListener(e -> handleClassCodeLookupFailure(etClassCode, e));
+    }
+
+    private void showStudentPhoneHintForClassroom(
+            DocumentSnapshot classroom,
+            String admissionNo,
+            TextInputEditText etAdmissionNo,
+            TextView tvPhoneHint) {
+        String sectionId = classroom.getString(SECTION_ID_FIELD);
+        if (TextUtils.isEmpty(sectionId)) {
+            etAdmissionNo.setError("Unable to verify student section");
+            tvPhoneHint.setVisibility(View.GONE);
+            return;
+        }
+
+        FirebaseFirestore.getInstance()
+                .collection(CLASS_SECTIONS_COLLECTION)
+                .document(sectionId)
+                .collection(STUDENTS_COLLECTION)
+                .document(admissionNo)
+                .get()
+                .addOnSuccessListener(student -> {
+                    if (student.exists()) {
+                        showPhoneSuffixHint(normalizePhone(student.getString(PHONE_FIELD)), tvPhoneHint);
+                    } else {
+                        showStudentPhoneHintByAdmissionField(sectionId, admissionNo, etAdmissionNo, tvPhoneHint, false);
+                    }
+                })
+                .addOnFailureListener(e -> handleStudentLookupFailure(etAdmissionNo, e));
+    }
+
+    private void showStudentPhoneHintByAdmissionField(
+            String sectionId,
+            String admissionNo,
+            TextInputEditText etAdmissionNo,
+            TextView tvPhoneHint,
+            boolean numericQuery) {
+        Object admissionValue = admissionNo;
+        if (numericQuery) {
+            try {
+                admissionValue = Long.parseLong(admissionNo);
+            } catch (NumberFormatException e) {
+                etAdmissionNo.setError("Invalid admission number");
+                tvPhoneHint.setVisibility(View.GONE);
+                return;
+            }
+        }
+
+        FirebaseFirestore.getInstance()
+                .collection(CLASS_SECTIONS_COLLECTION)
+                .document(sectionId)
+                .collection(STUDENTS_COLLECTION)
+                .whereEqualTo(ADMISSION_NO_FIELD, admissionValue)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (!querySnapshot.isEmpty()) {
+                        showPhoneSuffixHint(normalizePhone(querySnapshot.getDocuments().get(0).getString(PHONE_FIELD)), tvPhoneHint);
+                    } else if (!numericQuery && TextUtils.isDigitsOnly(admissionNo)) {
+                        showStudentPhoneHintByAdmissionField(sectionId, admissionNo, etAdmissionNo, tvPhoneHint, true);
+                    } else {
+                        etAdmissionNo.setError("Invalid admission number");
+                        tvPhoneHint.setVisibility(View.GONE);
+                    }
+                })
+                .addOnFailureListener(e -> handleStudentLookupFailure(etAdmissionNo, e));
+    }
+
+    private void showPhoneSuffixHint(String phone, TextView tvPhoneHint) {
+        if (TextUtils.isEmpty(phone)) {
+            tvPhoneHint.setVisibility(View.GONE);
+            return;
+        }
+
+        String suffix = phone.length() <= 3 ? phone : phone.substring(phone.length() - 3);
+        tvPhoneHint.setText("Registered phone ends with " + suffix);
+        tvPhoneHint.setVisibility(View.VISIBLE);
+    }
+
+    private String normalizePhone(String phone) {
+        if (phone == null) {
+            return "";
+        }
+        return phone.replaceAll("[^0-9]", "");
+    }
+
+    private void handleStudentLookupFailure(TextInputEditText editText, Exception e) {
+        Log.w(TAG, "Unable to verify student", e);
+        editText.setError("Unable to verify student");
+        Toast.makeText(this, "Unable to verify student. Check internet or DNS.", Toast.LENGTH_SHORT).show();
     }
 
     private void onClassCodeVerified(String classroomId, androidx.appcompat.app.AlertDialog dialog) {
