@@ -854,9 +854,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
 
         mWebView.setVisibility(View.VISIBLE);
-        if (mWebView.getUrl() == null || "about:blank".equals(mWebView.getUrl())) {
-            mWebView.loadUrl("http://levelup.technikh.com/");
-        }
     }
 
     private void showWebViewToolbar() {
