@@ -8,6 +8,7 @@ public class MyApp extends Application {
     private String currentSectionId = null;
     private String currentStudentAdmissionNo = null;
     private String currentStudentName = null;
+    private boolean currentQuizModeEnabled = false;
 
     @Override
     public void onCreate() {
@@ -40,10 +41,19 @@ public class MyApp extends Application {
         return currentStudentName;
     }
 
+    public void setCurrentQuizModeEnabled(boolean value) {
+        this.currentQuizModeEnabled = value;
+    }
+
+    public boolean isCurrentQuizModeEnabled() {
+        return currentQuizModeEnabled;
+    }
+
     public void clearTempString() {
         this.currentClassCode = null;
         this.currentSectionId = null;
         this.currentStudentAdmissionNo = null;
         this.currentStudentName = null;
+        this.currentQuizModeEnabled = false;
     }
 }

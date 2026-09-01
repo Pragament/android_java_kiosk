@@ -62,6 +62,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private static final String TAG = "MainActivity";
     private static final String CLASSROOMS_COLLECTION = "classrooms";
     private static final String CLASS_CODE_FIELD = "classCode";
+    private static final String CLASS_ENABLED_FIELD = "classEnabled";
+    private static final String QUIZ_MODE_ENABLED_FIELD = "quizModeEnabled";
     private static final String CLASS_SECTIONS_COLLECTION = "classSections";
     private static final String SECTION_ID_FIELD = "sectionId";
     private static final String STUDENTS_COLLECTION = "students";
@@ -317,7 +319,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                             + ", pendingWrites=" + documentSnapshot.getMetadata().hasPendingWrites()
                             + ", data=" + documentSnapshot.getData());
                     if (documentSnapshot.exists()) {
-                        authenticateStudent(documentSnapshot, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint);
+                        authenticateStudentIfClassroomEnabled(documentSnapshot, admissionNo, phone, dialog, etClassCode, etAdmissionNo, etPhone, tvPhoneHint);
                     } else {
                         authenticateClassCodeField(firestore, code, admissionNo, phone, dialog, etClassCode, etAdmissionNo, etPhone, tvPhoneHint, false);
                     }
@@ -396,7 +398,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         if (!querySnapshot.isEmpty()) {
             DocumentSnapshot classroom = querySnapshot.getDocuments().get(0);
-            authenticateStudent(classroom, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint);
+            authenticateStudentIfClassroomEnabled(classroom, admissionNo, phone, dialog, etClassCode, etAdmissionNo, etPhone, tvPhoneHint);
         } else if (!numericQuery && TextUtils.isDigitsOnly(code)) {
             Log.d(TAG, "handleClassCodeQueryResult: string query empty; retrying as numeric code");
             authenticateClassCodeField(firestore, code, admissionNo, phone, dialog, etClassCode, etAdmissionNo, etPhone, tvPhoneHint, true);
@@ -404,6 +406,24 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             Log.w(TAG, "handleClassCodeQueryResult: no classroom found for code=" + code);
             etClassCode.setError("Invalid code");
         }
+    }
+
+    private void authenticateStudentIfClassroomEnabled(
+            DocumentSnapshot classroom,
+            String admissionNo,
+            String phone,
+            androidx.appcompat.app.AlertDialog dialog,
+            TextInputEditText etClassCode,
+            TextInputEditText etAdmissionNo,
+            TextInputEditText etPhone,
+            TextView tvPhoneHint) {
+        if (!Boolean.TRUE.equals(classroom.getBoolean(CLASS_ENABLED_FIELD))) {
+            Log.w(TAG, "authenticateStudentIfClassroomEnabled: classroom disabled, classroomId=" + classroom.getId());
+            showClassCodeError(etClassCode, "Classroom is disabled");
+            return;
+        }
+
+        authenticateStudent(classroom, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint);
     }
 
     private void authenticateStudent(
@@ -416,6 +436,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             TextView tvPhoneHint) {
         String classroomId = classroom.getId();
         String sectionId = classroom.getString(SECTION_ID_FIELD);
+        boolean quizModeEnabled = Boolean.TRUE.equals(classroom.getBoolean(QUIZ_MODE_ENABLED_FIELD));
         if (TextUtils.isEmpty(sectionId)) {
             Log.w(TAG, "authenticateStudent: classroom has no sectionId, classroomId=" + classroomId);
             etAdmissionNo.setError("Unable to verify student section");
@@ -432,9 +453,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .get()
                 .addOnSuccessListener(student -> {
                     if (student.exists()) {
-                        verifyStudentPhone(classroomId, sectionId, student, phone, dialog, etPhone, tvPhoneHint);
+                        verifyStudentPhone(classroomId, sectionId, quizModeEnabled, student, phone, dialog, etPhone, tvPhoneHint);
                     } else {
-                        authenticateStudentByAdmissionField(classroomId, sectionId, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, false);
+                        authenticateStudentByAdmissionField(classroomId, sectionId, quizModeEnabled, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, false);
                     }
                 })
                 .addOnFailureListener(e -> handleStudentLookupFailure(etAdmissionNo, e));
@@ -443,6 +464,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private void authenticateStudentByAdmissionField(
             String classroomId,
             String sectionId,
+            boolean quizModeEnabled,
             String admissionNo,
             String phone,
             androidx.appcompat.app.AlertDialog dialog,
@@ -469,9 +491,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
                     if (!querySnapshot.isEmpty()) {
-                        verifyStudentPhone(classroomId, sectionId, querySnapshot.getDocuments().get(0), phone, dialog, etPhone, tvPhoneHint);
+                        verifyStudentPhone(classroomId, sectionId, quizModeEnabled, querySnapshot.getDocuments().get(0), phone, dialog, etPhone, tvPhoneHint);
                     } else if (!numericQuery && TextUtils.isDigitsOnly(admissionNo)) {
-                        authenticateStudentByAdmissionField(classroomId, sectionId, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, true);
+                        authenticateStudentByAdmissionField(classroomId, sectionId, quizModeEnabled, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, true);
                     } else {
                         Log.w(TAG, "authenticateStudentByAdmissionField: no student found for admissionNo=" + admissionNo);
                         etAdmissionNo.setError("Invalid admission number");
@@ -483,6 +505,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private void verifyStudentPhone(
             String classroomId,
             String sectionId,
+            boolean quizModeEnabled,
             DocumentSnapshot student,
             String phone,
             androidx.appcompat.app.AlertDialog dialog,
@@ -504,7 +527,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 sectionId,
                 getStudentAdmissionNo(student),
                 student.getString("name"));
-        onClassCodeVerified(classroomId, dialog);
+        onClassCodeVerified(classroomId, dialog, quizModeEnabled);
     }
 
     private String getStudentAdmissionNo(DocumentSnapshot student) {
@@ -541,7 +564,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .get()
                 .addOnSuccessListener(classroom -> {
                     if (classroom.exists()) {
-                        showStudentPhoneHintForClassroom(classroom, admissionNo, etAdmissionNo, tvPhoneHint);
+                        showStudentPhoneHintForClassroom(classroom, admissionNo, etClassCode, etAdmissionNo, tvPhoneHint);
                     } else {
                         showStudentPhoneHintByClassCodeField(firestore, code, admissionNo, etClassCode, etAdmissionNo, tvPhoneHint, false);
                     }
@@ -573,7 +596,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
                     if (!querySnapshot.isEmpty()) {
-                        showStudentPhoneHintForClassroom(querySnapshot.getDocuments().get(0), admissionNo, etAdmissionNo, tvPhoneHint);
+                        showStudentPhoneHintForClassroom(querySnapshot.getDocuments().get(0), admissionNo, etClassCode, etAdmissionNo, tvPhoneHint);
                     } else if (!numericQuery && TextUtils.isDigitsOnly(code)) {
                         showStudentPhoneHintByClassCodeField(firestore, code, admissionNo, etClassCode, etAdmissionNo, tvPhoneHint, true);
                     } else {
@@ -587,8 +610,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private void showStudentPhoneHintForClassroom(
             DocumentSnapshot classroom,
             String admissionNo,
+            TextInputEditText etClassCode,
             TextInputEditText etAdmissionNo,
             TextView tvPhoneHint) {
+        if (!Boolean.TRUE.equals(classroom.getBoolean(CLASS_ENABLED_FIELD))) {
+            showClassCodeError(etClassCode, "Classroom is disabled");
+            tvPhoneHint.setVisibility(View.GONE);
+            return;
+        }
+
         String sectionId = classroom.getString(SECTION_ID_FIELD);
         if (TextUtils.isEmpty(sectionId)) {
             etAdmissionNo.setError("Unable to verify student section");
@@ -672,12 +702,41 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         Toast.makeText(this, "Unable to verify student. Check internet or DNS.", Toast.LENGTH_SHORT).show();
     }
 
-    private void onClassCodeVerified(String classroomId, androidx.appcompat.app.AlertDialog dialog) {
-        Log.i(TAG, "onClassCodeVerified: classroomId=" + classroomId);
+    private void onClassCodeVerified(String classroomId, androidx.appcompat.app.AlertDialog dialog, boolean quizModeEnabled) {
+        Log.i(TAG, "onClassCodeVerified: classroomId=" + classroomId + ", quizModeEnabled=" + quizModeEnabled);
         Toast.makeText(this, "Verified", Toast.LENGTH_SHORT).show();
-        ((MyApp) getApplicationContext()).setCurrentClassCode(classroomId);
+        MyApp app = (MyApp) getApplicationContext();
+        app.setCurrentClassCode(classroomId);
+        app.setCurrentQuizModeEnabled(quizModeEnabled);
         dialog.dismiss();
-        loadWhitelistedApps(classroomId);
+        if (quizModeEnabled) {
+            hideHomepageForQuizMode();
+            openQuizActivity();
+        } else {
+            loadWhitelistedApps(classroomId);
+        }
+    }
+
+    private void hideHomepageForQuizMode() {
+        if (llTools != null) {
+            llTools.setVisibility(View.GONE);
+        }
+        if (txtWhitelistedAppsTitle != null) {
+            txtWhitelistedAppsTitle.setVisibility(View.GONE);
+        }
+        if (whitelistedAppsScrollView != null) {
+            whitelistedAppsScrollView.setVisibility(View.GONE);
+        }
+        if (txtWhitelistedWebsitesTitle != null) {
+            txtWhitelistedWebsitesTitle.setVisibility(View.GONE);
+        }
+        if (whitelistedWebsitesScrollView != null) {
+            whitelistedWebsitesScrollView.setVisibility(View.GONE);
+        }
+        if (mWebView != null) {
+            mWebView.setVisibility(View.GONE);
+            mWebView.loadUrl("about:blank");
+        }
     }
 
     private void loadWhitelistedApps(String classroomId) {
@@ -1166,6 +1225,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     protected void onResume() {
         super.onResume();
         hideSystemUI();
+        MyApp app = (MyApp) getApplicationContext();
+        if (app.isCurrentQuizModeEnabled() && !TextUtils.isEmpty(app.getCurrentClassCode())) {
+            hideHomepageForQuizMode();
+            openQuizActivity();
+        }
     }
 
     @Override
