@@ -82,6 +82,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     ProgressBar progressBar;
     TextView txtView;
     LinearLayout llTools;
+    Button buttonQuiz;
     Boolean isChromeModeEnabled;
     boolean isWhitelistedAppsExpanded = true;
     boolean isWhitelistedWebsitesExpanded = true;
@@ -98,6 +99,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .getBoolean(getString(R.string.pref_opt_chrome_mode), true);
         buttonRefresh = (Button) findViewById(R.id.buttonRefresh);
         buttonBack = (Button) findViewById(R.id.buttonBack);
+        buttonQuiz = (Button) findViewById(R.id.buttonQuiz);
         llTools = findViewById(R.id.llTools);
         llWhitelistedApps = findViewById(R.id.llWhitelistedApps);
         llWhitelistedWebsites = findViewById(R.id.llWhitelistedWebsites);
@@ -107,6 +109,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         txtWhitelistedWebsitesTitle = findViewById(R.id.txtWhitelistedWebsitesTitle);
         txtWhitelistedAppsTitle.setOnClickListener(v -> toggleWhitelistedApps());
         txtWhitelistedWebsitesTitle.setOnClickListener(v -> toggleWhitelistedWebsites());
+        buttonQuiz.setOnClickListener(v -> openQuizActivity());
         setupWebView();
         if (!isChromeModeEnabled) {
             //buttonRefresh.setVisibility(View.VISIBLE);
@@ -429,7 +432,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .get()
                 .addOnSuccessListener(student -> {
                     if (student.exists()) {
-                        verifyStudentPhone(classroomId, student, phone, dialog, etPhone, tvPhoneHint);
+                        verifyStudentPhone(classroomId, sectionId, student, phone, dialog, etPhone, tvPhoneHint);
                     } else {
                         authenticateStudentByAdmissionField(classroomId, sectionId, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, false);
                     }
@@ -466,7 +469,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
                     if (!querySnapshot.isEmpty()) {
-                        verifyStudentPhone(classroomId, querySnapshot.getDocuments().get(0), phone, dialog, etPhone, tvPhoneHint);
+                        verifyStudentPhone(classroomId, sectionId, querySnapshot.getDocuments().get(0), phone, dialog, etPhone, tvPhoneHint);
                     } else if (!numericQuery && TextUtils.isDigitsOnly(admissionNo)) {
                         authenticateStudentByAdmissionField(classroomId, sectionId, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, true);
                     } else {
@@ -479,6 +482,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     private void verifyStudentPhone(
             String classroomId,
+            String sectionId,
             DocumentSnapshot student,
             String phone,
             androidx.appcompat.app.AlertDialog dialog,
@@ -496,7 +500,25 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
 
         Log.i(TAG, "verifyStudentPhone: verified classroomId=" + classroomId + ", student=" + student.getId());
+        ((MyApp) getApplicationContext()).setCurrentStudent(
+                sectionId,
+                getStudentAdmissionNo(student),
+                student.getString("name"));
         onClassCodeVerified(classroomId, dialog);
+    }
+
+    private String getStudentAdmissionNo(DocumentSnapshot student) {
+        String admissionNo = student.getString(ADMISSION_NO_FIELD);
+        return TextUtils.isEmpty(admissionNo) ? student.getId() : admissionNo;
+    }
+
+    private void openQuizActivity() {
+        if (TextUtils.isEmpty(((MyApp) getApplicationContext()).getCurrentClassCode())) {
+            Toast.makeText(this, "Verify classroom first", Toast.LENGTH_SHORT).show();
+            showClassCodeDialog();
+            return;
+        }
+        startActivity(new Intent(this, QuizActivity.class));
     }
 
     private void showStudentPhoneHint(
