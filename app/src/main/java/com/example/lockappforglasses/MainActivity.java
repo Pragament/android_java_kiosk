@@ -64,6 +64,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private static final String CLASS_CODE_FIELD = "classCode";
     private static final String CLASS_ENABLED_FIELD = "classEnabled";
     private static final String QUIZ_MODE_ENABLED_FIELD = "quizModeEnabled";
+    private static final String QUESTION_BANK_LIST_ID_FIELD = "questionBankListId";
     private static final String CLASS_SECTIONS_COLLECTION = "classSections";
     private static final String SECTION_ID_FIELD = "sectionId";
     private static final String STUDENTS_COLLECTION = "students";
@@ -437,6 +438,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         String classroomId = classroom.getId();
         String sectionId = classroom.getString(SECTION_ID_FIELD);
         boolean quizModeEnabled = Boolean.TRUE.equals(classroom.getBoolean(QUIZ_MODE_ENABLED_FIELD));
+        String questionBankListId = classroom.getString(QUESTION_BANK_LIST_ID_FIELD);
         if (TextUtils.isEmpty(sectionId)) {
             Log.w(TAG, "authenticateStudent: classroom has no sectionId, classroomId=" + classroomId);
             etAdmissionNo.setError("Unable to verify student section");
@@ -453,9 +455,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .get()
                 .addOnSuccessListener(student -> {
                     if (student.exists()) {
-                        verifyStudentPhone(classroomId, sectionId, quizModeEnabled, student, phone, dialog, etPhone, tvPhoneHint);
+                        verifyStudentPhone(classroomId, sectionId, quizModeEnabled, questionBankListId, student, phone, dialog, etPhone, tvPhoneHint);
                     } else {
-                        authenticateStudentByAdmissionField(classroomId, sectionId, quizModeEnabled, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, false);
+                        authenticateStudentByAdmissionField(classroomId, sectionId, quizModeEnabled, questionBankListId, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, false);
                     }
                 })
                 .addOnFailureListener(e -> handleStudentLookupFailure(etAdmissionNo, e));
@@ -465,6 +467,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             String classroomId,
             String sectionId,
             boolean quizModeEnabled,
+            String questionBankListId,
             String admissionNo,
             String phone,
             androidx.appcompat.app.AlertDialog dialog,
@@ -491,9 +494,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
                     if (!querySnapshot.isEmpty()) {
-                        verifyStudentPhone(classroomId, sectionId, quizModeEnabled, querySnapshot.getDocuments().get(0), phone, dialog, etPhone, tvPhoneHint);
+                        verifyStudentPhone(classroomId, sectionId, quizModeEnabled, questionBankListId, querySnapshot.getDocuments().get(0), phone, dialog, etPhone, tvPhoneHint);
                     } else if (!numericQuery && TextUtils.isDigitsOnly(admissionNo)) {
-                        authenticateStudentByAdmissionField(classroomId, sectionId, quizModeEnabled, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, true);
+                        authenticateStudentByAdmissionField(classroomId, sectionId, quizModeEnabled, questionBankListId, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, true);
                     } else {
                         Log.w(TAG, "authenticateStudentByAdmissionField: no student found for admissionNo=" + admissionNo);
                         etAdmissionNo.setError("Invalid admission number");
@@ -506,6 +509,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             String classroomId,
             String sectionId,
             boolean quizModeEnabled,
+            String questionBankListId,
             DocumentSnapshot student,
             String phone,
             androidx.appcompat.app.AlertDialog dialog,
@@ -527,7 +531,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 sectionId,
                 getStudentAdmissionNo(student),
                 student.getString("name"));
-        onClassCodeVerified(classroomId, dialog, quizModeEnabled);
+        onClassCodeVerified(classroomId, dialog, quizModeEnabled, questionBankListId);
     }
 
     private String getStudentAdmissionNo(DocumentSnapshot student) {
@@ -702,14 +706,18 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         Toast.makeText(this, "Unable to verify student. Check internet or DNS.", Toast.LENGTH_SHORT).show();
     }
 
-    private void onClassCodeVerified(String classroomId, androidx.appcompat.app.AlertDialog dialog, boolean quizModeEnabled) {
-        Log.i(TAG, "onClassCodeVerified: classroomId=" + classroomId + ", quizModeEnabled=" + quizModeEnabled);
+    private void onClassCodeVerified(String classroomId, androidx.appcompat.app.AlertDialog dialog, boolean quizModeEnabled, String questionBankListId) {
+        boolean hasQuestionBankList = !TextUtils.isEmpty(questionBankListId);
+        Log.i(TAG, "onClassCodeVerified: classroomId=" + classroomId
+                + ", quizModeEnabled=" + quizModeEnabled
+                + ", questionBankListId=" + questionBankListId);
         Toast.makeText(this, "Verified", Toast.LENGTH_SHORT).show();
         MyApp app = (MyApp) getApplicationContext();
         app.setCurrentClassCode(classroomId);
-        app.setCurrentQuizModeEnabled(quizModeEnabled);
+        app.setCurrentQuizModeEnabled(quizModeEnabled || hasQuestionBankList);
+        app.setCurrentQuestionBankListId(questionBankListId);
         dialog.dismiss();
-        if (quizModeEnabled) {
+        if (quizModeEnabled || hasQuestionBankList) {
             hideHomepageForQuizMode();
             openQuizActivity();
         } else {

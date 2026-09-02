@@ -24,6 +24,10 @@ Recommended document id:
   // Used by the app to fetch one student's submissions.
   studentKey: 'QQAP9O4UyvlaYhqz7jdE_102',
 
+  // Present when a classroom-assigned qb_lists_v1 list was used.
+  questionBankListId: 'qb_lists_v1 document id',
+  questionBankListName: 'Favorites',
+
   className: 'IX',
   subject: 'Mathematics',
   chapters: ['Algebra', 'Polynomials'],
@@ -71,6 +75,8 @@ Recommended document id:
 ## Field Notes
 
 - `studentKey` is `${sectionId}_${admissionNo}`. The app queries this field to show past submissions for the verified student.
+- `questionBankListId` is set when the submission came from a classroom-assigned `qb_lists_v1` list; otherwise `null`.
+- `questionBankListName` snapshots the list name at submission time; otherwise `null`.
 - `submittedAt` uses `FieldValue.serverTimestamp()` when Firestore syncs.
 - `submittedAtMillis` is written from the device clock so the app can sort submissions even when server timestamp is not yet available.
 - `answers` stores enough question and answer content to support reviewing past submissions even if the original question-bank document later changes.

@@ -21,6 +21,8 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -39,6 +41,7 @@ import java.util.Set;
 public class QuizActivity extends AppCompatActivity {
 
     private static final String QUESTION_BANK_COLLECTION = "qb_questions_v1";
+    private static final String QUESTION_BANK_LISTS_COLLECTION = "qb_lists_v1";
     private static final String SUBMISSIONS_COLLECTION = "qb_quiz_submissions_v1";
 
     private Spinner spinnerClass;
@@ -62,6 +65,9 @@ public class QuizActivity extends AppCompatActivity {
     private final List<String> selectedChapters = new ArrayList<>();
     private int currentQuestionIndex = 0;
     private boolean quizStarted = false;
+    private boolean questionBankListMode = false;
+    private String questionBankListId = "";
+    private String questionBankListName = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -111,7 +117,104 @@ public class QuizActivity extends AppCompatActivity {
             }
         });
 
-        loadQuestionBank();
+        questionBankListId = ((MyApp) getApplicationContext()).getCurrentQuestionBankListId();
+        questionBankListMode = !TextUtils.isEmpty(questionBankListId);
+        if (questionBankListMode) {
+            showQuestionBankListSetup();
+            loadQuestionBankList();
+        } else {
+            loadQuestionBank();
+        }
+    }
+
+    private void showQuestionBankListSetup() {
+        for (int i = 0; i < setupPanel.getChildCount(); i++) {
+            View child = setupPanel.getChildAt(i);
+            child.setVisibility(child == buttonStartQuiz || child == tvSetupStatus ? View.VISIBLE : View.GONE);
+        }
+        buttonStartQuiz.setEnabled(false);
+        tvSetupStatus.setText("Loading assigned quiz...");
+    }
+
+    private void loadQuestionBankList() {
+        FirebaseFirestore.getInstance()
+                .collection(QUESTION_BANK_LISTS_COLLECTION)
+                .document(questionBankListId)
+                .get()
+                .addOnSuccessListener(this::loadQuestionsFromList)
+                .addOnFailureListener(e -> {
+                    tvSetupStatus.setText("Unable to load assigned quiz.");
+                    Toast.makeText(this, "Unable to load assigned quiz", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void loadQuestionsFromList(DocumentSnapshot listDocument) {
+        if (!listDocument.exists()) {
+            tvSetupStatus.setText("Assigned quiz was not found.");
+            return;
+        }
+
+        questionBankListName = listDocument.getString("name");
+        List<Object> rawQuestionIds = (List<Object>) listDocument.get("questionIds");
+        if (rawQuestionIds == null || rawQuestionIds.isEmpty()) {
+            tvSetupStatus.setText("Assigned quiz has no questions.");
+            return;
+        }
+
+        ArrayList<String> questionIds = new ArrayList<>();
+        ArrayList<Task<DocumentSnapshot>> tasks = new ArrayList<>();
+        for (Object rawQuestionId : rawQuestionIds) {
+            if (rawQuestionId == null || TextUtils.isEmpty(rawQuestionId.toString())) {
+                continue;
+            }
+            String questionId = rawQuestionId.toString();
+            questionIds.add(questionId);
+            tasks.add(FirebaseFirestore.getInstance()
+                    .collection(QUESTION_BANK_COLLECTION)
+                    .document(questionId)
+                    .get());
+        }
+
+        if (tasks.isEmpty()) {
+            tvSetupStatus.setText("Assigned quiz has no valid questions.");
+            return;
+        }
+
+        Tasks.whenAllSuccess(tasks)
+                .addOnSuccessListener(results -> showQuestionBankListQuestions(questionIds, results))
+                .addOnFailureListener(e -> {
+                    tvSetupStatus.setText("Unable to load assigned quiz questions.");
+                    Toast.makeText(this, "Unable to load assigned questions", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void showQuestionBankListQuestions(List<String> questionIds, List<Object> results) {
+        HashMap<String, Question> questionsById = new HashMap<>();
+        for (Object result : results) {
+            if (result instanceof DocumentSnapshot) {
+                DocumentSnapshot document = (DocumentSnapshot) result;
+                Question question = Question.fromDocument(document);
+                if (question != null) {
+                    questionsById.put(question.id, question);
+                }
+            }
+        }
+
+        allPublishedQuestions.clear();
+        for (String questionId : questionIds) {
+            Question question = questionsById.get(questionId);
+            if (question != null) {
+                allPublishedQuestions.add(question);
+            }
+        }
+
+        if (allPublishedQuestions.isEmpty()) {
+            tvSetupStatus.setText("Assigned quiz has no readable questions.");
+            return;
+        }
+
+        buttonStartQuiz.setEnabled(true);
+        tvSetupStatus.setText("Assigned quiz ready: " + getQuestionBankListDisplayName());
     }
 
     private void loadQuestionBank() {
@@ -222,6 +325,11 @@ public class QuizActivity extends AppCompatActivity {
     }
 
     private void startQuiz() {
+        if (questionBankListMode) {
+            startQuestionBankListQuiz();
+            return;
+        }
+
         String className = getSelectedSpinnerValue(spinnerClass);
         String subject = getSelectedSpinnerValue(spinnerSubject);
         String difficulty = getSelectedSpinnerValue(spinnerDifficulty);
@@ -251,6 +359,21 @@ public class QuizActivity extends AppCompatActivity {
         }
 
         Collections.shuffle(quizQuestions);
+        beginQuiz();
+    }
+
+    private void startQuestionBankListQuiz() {
+        quizQuestions.clear();
+        answers.clear();
+        quizQuestions.addAll(allPublishedQuestions);
+        if (quizQuestions.isEmpty()) {
+            Toast.makeText(this, "Assigned quiz has no questions", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        beginQuiz();
+    }
+
+    private void beginQuiz() {
         currentQuestionIndex = 0;
         quizStarted = true;
         setupPanel.setVisibility(View.GONE);
@@ -482,10 +605,12 @@ public class QuizActivity extends AppCompatActivity {
         submission.put("admissionNo", admissionNo);
         submission.put("studentName", app.getCurrentStudentName());
         submission.put("studentKey", getStudentKey(sectionId, admissionNo));
-        submission.put("className", getSelectedSpinnerValue(spinnerClass));
-        submission.put("subject", getSelectedSpinnerValue(spinnerSubject));
-        submission.put("chapters", new ArrayList<>(selectedChapters));
-        submission.put("difficulty", getSelectedSpinnerValue(spinnerDifficulty));
+        submission.put("questionBankListId", questionBankListMode ? questionBankListId : null);
+        submission.put("questionBankListName", questionBankListMode ? questionBankListName : null);
+        submission.put("className", getSubmissionClassName());
+        submission.put("subject", getSubmissionSubject());
+        submission.put("chapters", getSubmissionChapters());
+        submission.put("difficulty", getSubmissionDifficulty());
         submission.put("questionCount", quizQuestions.size());
         submission.put("answeredCount", answerPayload.size());
         submission.put("gradableCount", gradableCount);
@@ -501,6 +626,60 @@ public class QuizActivity extends AppCompatActivity {
                 .add(submission)
                 .addOnSuccessListener(documentReference -> showSubmissionReview(answerPayload, finalCorrectCount, finalGradableCount))
                 .addOnFailureListener(e -> Toast.makeText(this, "Submission saved locally and will sync when online", Toast.LENGTH_LONG).show());
+    }
+
+    private String getSubmissionClassName() {
+        if (!questionBankListMode) {
+            return getSelectedSpinnerValue(spinnerClass);
+        }
+        return firstNonEmptyValue("className");
+    }
+
+    private String getSubmissionSubject() {
+        if (!questionBankListMode) {
+            return getSelectedSpinnerValue(spinnerSubject);
+        }
+        return firstNonEmptyValue("subject");
+    }
+
+    private String getSubmissionDifficulty() {
+        if (!questionBankListMode) {
+            return getSelectedSpinnerValue(spinnerDifficulty);
+        }
+        return firstNonEmptyValue("difficulty");
+    }
+
+    private ArrayList<String> getSubmissionChapters() {
+        if (!questionBankListMode) {
+            return new ArrayList<>(selectedChapters);
+        }
+
+        LinkedHashSet<String> chapters = new LinkedHashSet<>();
+        for (Question question : quizQuestions) {
+            if (!TextUtils.isEmpty(question.chapter)) {
+                chapters.add(question.chapter);
+            }
+        }
+        return new ArrayList<>(chapters);
+    }
+
+    private String firstNonEmptyValue(String field) {
+        for (Question question : quizQuestions) {
+            if ("className".equals(field) && !TextUtils.isEmpty(question.className)) {
+                return question.className;
+            }
+            if ("subject".equals(field) && !TextUtils.isEmpty(question.subject)) {
+                return question.subject;
+            }
+            if ("difficulty".equals(field) && !TextUtils.isEmpty(question.difficulty)) {
+                return question.difficulty;
+            }
+        }
+        return "";
+    }
+
+    private String getQuestionBankListDisplayName() {
+        return TextUtils.isEmpty(questionBankListName) ? questionBankListId : questionBankListName;
     }
 
     private Map<String, Object> buildAnswerPayload(Question question, Answer answer, Boolean isCorrect) {

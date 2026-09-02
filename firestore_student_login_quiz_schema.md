@@ -10,10 +10,11 @@ This document covers the Firestore collections used by the Android kiosk app whe
 4. App reads `/classSections/{sectionId}/students/{admissionNo}` directly, or queries the section students by `admissionNo`.
 5. App shows the last 3 digits of the registered `phone` as a memory hint, then verifies the full entered phone number.
 6. If `quizModeEnabled == true`, app opens quiz activity directly and hides homepage apps, websites, and WebView.
-7. Quiz activity reads published questions from `qb_questions_v1`.
-8. After Start, the quiz runs from the locally loaded question list so the student can continue offline until Submit.
-9. App writes the attempt to `qb_quiz_submissions_v1`.
-10. App reads `qb_quiz_submissions_v1` by `studentKey` to show past submissions newest first.
+7. If `questionBankListId` is present, app opens quiz activity directly regardless of `quizModeEnabled`, hides homepage apps, websites, WebView, hides quiz filters, and loads only that list's questions in list order.
+8. Without `questionBankListId`, quiz activity reads published questions from `qb_questions_v1` and lets the student choose class, subject, chapters, and difficulty.
+9. After Start, the quiz runs from the locally loaded question list so the student can continue offline until Submit.
+10. App writes the attempt to `qb_quiz_submissions_v1`.
+11. App reads `qb_quiz_submissions_v1` by `studentKey` to show past submissions newest first.
 
 ## `classrooms`
 
@@ -42,7 +43,10 @@ In the current app, `classroomId` is usually the same as `classCode`, for exampl
   quizModeEnabled: true,
 
   sectionId: 'QQAP9O4UyvlaYhqz7jdE',
-  sectionName: 'DSS grade 8'
+  sectionName: 'DSS grade 8',
+
+  questionBankListId: 'qb_lists_v1 document id',
+  updatedAt: Timestamp
 }
 ```
 
@@ -51,6 +55,7 @@ In the current app, `classroomId` is usually the same as `classCode`, for exampl
 - `classCode`: Code entered by the student.
 - `classEnabled`: Student login is blocked unless this is exactly `true`.
 - `quizModeEnabled`: When `true`, the app hides homepage apps, websites, and WebView, then opens quiz activity directly.
+- `questionBankListId`: Optional reference to a teacher-selected question list. When present, it forces quiz-only mode even if `quizModeEnabled` is false or missing.
 - `sectionId`: Used to locate student records under `classSections`.
 
 ### App Access
@@ -183,9 +188,48 @@ Stores all question bank questions used by quiz activity.
 
 ### App Access
 
-- Quiz activity reads only questions where `status == 'published'`.
+- Quiz activity reads only questions where `status == 'published'` in filter mode.
+- In question-list mode, quiz activity reads only question documents listed in `qb_lists_v1.questionIds`.
 - Client-side filtering uses `className`, `subject`, `chapter`, and `difficulty`.
-- After the student taps Start, selected questions are shuffled and stored in memory so question navigation can continue offline.
+- In filter mode, selected questions are shuffled before the quiz starts.
+- In question-list mode, questions are shown in `questionIds` order and are not shuffled.
+- After the student taps Start, selected questions are stored in memory so question navigation can continue offline.
+
+## `qb_lists_v1`
+
+Stores teacher-managed ordered question lists.
+
+### Path
+
+```txt
+/qb_lists_v1/{listId}
+```
+
+### Document Shape
+
+```js
+{
+  name: 'Favorites',
+  ownerUid: 'firebase-auth-uid',
+  questionIds: [
+    'qb_questions_v1 document id'
+  ],
+  createdAt: Timestamp,
+  updatedAt: Timestamp
+}
+```
+
+### Field Notes
+
+- `ownerUid`: Teacher UID that owns the list. It should match the signed-in teacher UID for the list to appear in the classroom editor.
+- `name`: Display name for classroom question-list dropdowns and quiz submission snapshots.
+- `questionIds`: Ordered array of question document IDs from `qb_questions_v1`. The Android app preserves this exact order.
+
+### App Access
+
+- If a verified classroom has `questionBankListId`, quiz activity reads `/qb_lists_v1/{questionBankListId}`.
+- The app then reads each listed `/qb_questions_v1/{questionId}` document.
+- In this mode, class, subject, chapter, and difficulty filters are hidden.
 
 ## `qb_quiz_submissions_v1`
 
@@ -211,6 +255,9 @@ Recommended `submissionId`:
   studentName: 'Parunandi Sai Adithya',
 
   studentKey: 'QQAP9O4UyvlaYhqz7jdE_102',
+
+  questionBankListId: 'qb_lists_v1 document id',
+  questionBankListName: 'Favorites',
 
   className: 'IX',
   subject: 'Mathematics',
@@ -247,6 +294,8 @@ Recommended `submissionId`:
 ### Field Notes
 
 - `studentKey`: `${sectionId}_${admissionNo}`. Used to load the verified student's past submissions.
+- `questionBankListId`: Set when the quiz came from a classroom-assigned `qb_lists_v1` list; otherwise `null`.
+- `questionBankListName`: Snapshot of the list name at submission time; otherwise `null`.
 - `answers`: Stores prompt and answer snapshots so reviews still work if a question bank document later changes.
 - `isCorrect`: `true` or `false` for auto-graded questions; `null` for `short_answer`.
 - `submittedAt`: Server timestamp.
@@ -266,6 +315,8 @@ High-level recommendations:
 - Require `classEnabled == true` before allowing student login flows.
 - Allow reading `classSections/{sectionId}/students/{studentId}` only for verification or teacher/admin access.
 - Allow reading `qb_questions_v1` where `status == 'published'`.
+- Allow verified students to read the `qb_lists_v1` document referenced by their enabled classroom.
+- Allow verified students to read `qb_questions_v1` documents referenced by their enabled classroom's `questionBankListId`.
 - Allow students to create only their own `qb_quiz_submissions_v1` documents.
 - Disable student updates and deletes for quiz submissions.
 - Allow teachers/admins to read submissions for their own sections/classes.
@@ -282,6 +333,9 @@ qb_questions_v1:
   className ASC
   subject ASC
   difficulty ASC
+
+qb_lists_v1:
+  ownerUid ASC
 
 qb_quiz_submissions_v1:
   studentKey ASC

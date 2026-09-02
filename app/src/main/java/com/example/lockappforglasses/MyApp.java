@@ -9,6 +9,7 @@ public class MyApp extends Application {
     private String currentStudentAdmissionNo = null;
     private String currentStudentName = null;
     private boolean currentQuizModeEnabled = false;
+    private String currentQuestionBankListId = null;
 
     @Override
     public void onCreate() {
@@ -49,11 +50,20 @@ public class MyApp extends Application {
         return currentQuizModeEnabled;
     }
 
+    public void setCurrentQuestionBankListId(String value) {
+        this.currentQuestionBankListId = value;
+    }
+
+    public String getCurrentQuestionBankListId() {
+        return currentQuestionBankListId;
+    }
+
     public void clearTempString() {
         this.currentClassCode = null;
         this.currentSectionId = null;
         this.currentStudentAdmissionNo = null;
         this.currentStudentName = null;
         this.currentQuizModeEnabled = false;
+        this.currentQuestionBankListId = null;
     }
 }
