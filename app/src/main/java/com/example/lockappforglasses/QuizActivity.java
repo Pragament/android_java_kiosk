@@ -1,5 +1,6 @@
 package com.example.lockappforglasses;
 
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.Html;
@@ -52,6 +53,7 @@ public class QuizActivity extends AppCompatActivity {
     private LinearLayout questionPanel;
     private LinearLayout reviewPanel;
     private LinearLayout llAnswerArea;
+    private TextView tvLoggedInStudent;
     private TextView tvSetupStatus;
     private TextView tvQuestionNumber;
     private TextView tvQuestionPrompt;
@@ -83,6 +85,7 @@ public class QuizActivity extends AppCompatActivity {
         questionPanel = findViewById(R.id.questionPanel);
         reviewPanel = findViewById(R.id.reviewPanel);
         llAnswerArea = findViewById(R.id.llAnswerArea);
+        tvLoggedInStudent = findViewById(R.id.tvLoggedInStudent);
         tvSetupStatus = findViewById(R.id.tvSetupStatus);
         tvQuestionNumber = findViewById(R.id.tvQuestionNumber);
         tvQuestionPrompt = findViewById(R.id.tvQuestionPrompt);
@@ -92,6 +95,7 @@ public class QuizActivity extends AppCompatActivity {
 
         findViewById(R.id.buttonCloseQuiz).setOnClickListener(v -> finish());
         findViewById(R.id.buttonPastSubmissions).setOnClickListener(v -> loadPastSubmissions());
+        findViewById(R.id.buttonLogout).setOnClickListener(v -> logoutStudent());
         buttonStartQuiz.setOnClickListener(v -> startQuiz());
         buttonNextQuestion.setOnClickListener(v -> goToNextQuestion());
         buttonSubmitQuiz.setOnClickListener(v -> submitQuiz());
@@ -117,6 +121,7 @@ public class QuizActivity extends AppCompatActivity {
             }
         });
 
+        showLoggedInStudent();
         questionBankListId = ((MyApp) getApplicationContext()).getCurrentQuestionBankListId();
         questionBankListMode = !TextUtils.isEmpty(questionBankListId);
         if (questionBankListMode) {
@@ -125,6 +130,23 @@ public class QuizActivity extends AppCompatActivity {
         } else {
             loadQuestionBank();
         }
+    }
+
+    private void showLoggedInStudent() {
+        MyApp app = (MyApp) getApplicationContext();
+        String studentName = app.getCurrentStudentName();
+        if (TextUtils.isEmpty(studentName)) {
+            studentName = app.getCurrentStudentAdmissionNo();
+        }
+        tvLoggedInStudent.setText(TextUtils.isEmpty(studentName) ? "" : "Student: " + studentName);
+    }
+
+    private void logoutStudent() {
+        ((MyApp) getApplicationContext()).clearTempString();
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
 
     private void showQuestionBankListSetup() {
