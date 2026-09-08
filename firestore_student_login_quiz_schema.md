@@ -243,7 +243,8 @@ Stores student quiz attempts.
 
 Recommended `submissionId`:
 
-- Auto-generated Firestore document id.
+- Deterministic document id: `{classroomId}_{admissionNo}` after replacing unsupported characters with `_`.
+- This keeps one submission document per admission number within a classroom and prevents duplicates.
 
 ### Document Shape
 

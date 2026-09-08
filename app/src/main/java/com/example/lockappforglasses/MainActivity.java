@@ -227,7 +227,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this)
                 .setView(dialogLayout)
                 .setCancelable(false)
-                .setTitle("Classroom Code")
+                .setTitle("Quiz Session Code")
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Proceed", null);
 
@@ -420,7 +420,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             TextView tvPhoneHint) {
         if (!Boolean.TRUE.equals(classroom.getBoolean(CLASS_ENABLED_FIELD))) {
             Log.w(TAG, "authenticateStudentIfClassroomEnabled: classroom disabled, classroomId=" + classroom.getId());
-            showClassCodeError(etClassCode, "Classroom is disabled");
+            showClassCodeError(etClassCode, "Quiz session is disabled");
             return;
         }
 
@@ -541,7 +541,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     private void openQuizActivity() {
         if (TextUtils.isEmpty(((MyApp) getApplicationContext()).getCurrentClassCode())) {
-            Toast.makeText(this, "Verify classroom first", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Verify quiz session first", Toast.LENGTH_SHORT).show();
             showClassCodeDialog();
             return;
         }
@@ -618,7 +618,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             TextInputEditText etAdmissionNo,
             TextView tvPhoneHint) {
         if (!Boolean.TRUE.equals(classroom.getBoolean(CLASS_ENABLED_FIELD))) {
-            showClassCodeError(etClassCode, "Classroom is disabled");
+            showClassCodeError(etClassCode, "Quiz session is disabled");
             tvPhoneHint.setVisibility(View.GONE);
             return;
         }

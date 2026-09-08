@@ -596,9 +596,10 @@ public class QuizActivity extends AppCompatActivity {
         saveVisibleFreeTextAnswer();
 
         MyApp app = (MyApp) getApplicationContext();
+        String classroomId = app.getCurrentClassCode();
         String sectionId = app.getCurrentSectionId();
         String admissionNo = app.getCurrentStudentAdmissionNo();
-        if (TextUtils.isEmpty(sectionId) || TextUtils.isEmpty(admissionNo)) {
+        if (TextUtils.isEmpty(classroomId) || TextUtils.isEmpty(sectionId) || TextUtils.isEmpty(admissionNo)) {
             Toast.makeText(this, "Student verification is missing", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -622,7 +623,7 @@ public class QuizActivity extends AppCompatActivity {
         }
 
         HashMap<String, Object> submission = new HashMap<>();
-        submission.put("classroomId", app.getCurrentClassCode());
+        submission.put("classroomId", classroomId);
         submission.put("sectionId", sectionId);
         submission.put("admissionNo", admissionNo);
         submission.put("studentName", app.getCurrentStudentName());
@@ -643,11 +644,16 @@ public class QuizActivity extends AppCompatActivity {
 
         final int finalCorrectCount = correctCount;
         final int finalGradableCount = gradableCount;
+        buttonSubmitQuiz.setEnabled(false);
         FirebaseFirestore.getInstance()
                 .collection(SUBMISSIONS_COLLECTION)
-                .add(submission)
+                .document(getSubmissionDocumentId(classroomId, admissionNo))
+                .set(submission)
                 .addOnSuccessListener(documentReference -> showSubmissionReview(answerPayload, finalCorrectCount, finalGradableCount))
-                .addOnFailureListener(e -> Toast.makeText(this, "Submission saved locally and will sync when online", Toast.LENGTH_LONG).show());
+                .addOnFailureListener(e -> {
+                    buttonSubmitQuiz.setEnabled(true);
+                    Toast.makeText(this, "Submission saved locally and will sync when online", Toast.LENGTH_LONG).show();
+                });
     }
 
     private String getSubmissionClassName() {
@@ -816,9 +822,10 @@ public class QuizActivity extends AppCompatActivity {
 
     private void loadPastSubmissions() {
         MyApp app = (MyApp) getApplicationContext();
+        String classroomId = app.getCurrentClassCode();
         String sectionId = app.getCurrentSectionId();
         String admissionNo = app.getCurrentStudentAdmissionNo();
-        if (TextUtils.isEmpty(sectionId) || TextUtils.isEmpty(admissionNo)) {
+        if (TextUtils.isEmpty(classroomId) || TextUtils.isEmpty(sectionId) || TextUtils.isEmpty(admissionNo)) {
             Toast.makeText(this, "Student verification is missing", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -831,6 +838,7 @@ public class QuizActivity extends AppCompatActivity {
 
         FirebaseFirestore.getInstance()
                 .collection(SUBMISSIONS_COLLECTION)
+                .whereEqualTo("classroomId", classroomId)
                 .whereEqualTo("studentKey", getStudentKey(sectionId, admissionNo))
                 .get()
                 .addOnSuccessListener(this::showPastSubmissions)
@@ -894,6 +902,14 @@ public class QuizActivity extends AppCompatActivity {
 
     private String getStudentKey(String sectionId, String admissionNo) {
         return sectionId + "_" + admissionNo;
+    }
+
+    private String getSubmissionDocumentId(String classroomId, String admissionNo) {
+        return sanitizeDocumentId(classroomId) + "_" + sanitizeDocumentId(admissionNo);
+    }
+
+    private String sanitizeDocumentId(String value) {
+        return value.replaceAll("[^A-Za-z0-9_-]", "_");
     }
 
     private void addReviewText(String value) {
