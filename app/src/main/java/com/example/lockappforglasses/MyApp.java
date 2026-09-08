@@ -2,6 +2,9 @@ package com.example.lockappforglasses;
 
 import android.app.Application;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class MyApp extends Application {
 
     private String currentClassCode = null;
@@ -10,6 +13,8 @@ public class MyApp extends Application {
     private String currentStudentName = null;
     private boolean currentQuizModeEnabled = false;
     private String currentQuestionBankListId = null;
+    private Map<String, Integer> currentRandomQuestionTypeCounts = new HashMap<>();
+    private Map<String, String> currentStudentDifficultyLevels = new HashMap<>();
 
     @Override
     public void onCreate() {
@@ -58,6 +63,29 @@ public class MyApp extends Application {
         return currentQuestionBankListId;
     }
 
+    public void setCurrentQuizSessionOptions(
+            Map<String, Integer> randomQuestionTypeCounts,
+            Map<String, String> studentDifficultyLevels) {
+        this.currentRandomQuestionTypeCounts = randomQuestionTypeCounts == null
+                ? new HashMap<>()
+                : new HashMap<>(randomQuestionTypeCounts);
+        this.currentStudentDifficultyLevels = studentDifficultyLevels == null
+                ? new HashMap<>()
+                : new HashMap<>(studentDifficultyLevels);
+    }
+
+    public Map<String, Integer> getCurrentRandomQuestionTypeCounts() {
+        return new HashMap<>(currentRandomQuestionTypeCounts);
+    }
+
+    public String getCurrentStudentDifficultyLevel() {
+        if (currentStudentAdmissionNo == null) {
+            return "";
+        }
+        String difficulty = currentStudentDifficultyLevels.get(currentStudentAdmissionNo);
+        return difficulty == null ? "" : difficulty;
+    }
+
     public void clearTempString() {
         this.currentClassCode = null;
         this.currentSectionId = null;
@@ -65,5 +93,7 @@ public class MyApp extends Application {
         this.currentStudentName = null;
         this.currentQuizModeEnabled = false;
         this.currentQuestionBankListId = null;
+        this.currentRandomQuestionTypeCounts.clear();
+        this.currentStudentDifficultyLevels.clear();
     }
 }

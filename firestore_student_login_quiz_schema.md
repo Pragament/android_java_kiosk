@@ -46,6 +46,17 @@ In the current app, `classroomId` is usually the same as `classCode`, for exampl
   sectionName: 'DSS grade 8',
 
   questionBankListId: 'qb_lists_v1 document id',
+  randomQuestionTypeCounts: {
+    mcq: 10,
+    fib: 5,
+    short_answer: 3,
+    true_false: 2
+  },
+  studentDifficultyLevels: {
+    '102': 'Easy',
+    '103': 'Hard'
+  },
+  studentDifficultyUpdatedAt: Timestamp,
   updatedAt: Timestamp
 }
 ```
@@ -56,6 +67,8 @@ In the current app, `classroomId` is usually the same as `classCode`, for exampl
 - `classEnabled`: Student login is blocked unless this is exactly `true`.
 - `quizModeEnabled`: When `true`, the app hides homepage apps, websites, and WebView, then opens quiz activity directly.
 - `questionBankListId`: Optional reference to a teacher-selected question list. When present, it forces quiz-only mode even if `quizModeEnabled` is false or missing.
+- `randomQuestionTypeCounts`: Optional per-type limits for randomly picking questions from the selected question list. Missing or empty means use all questions.
+- `studentDifficultyLevels`: Optional admission-number keyed difficulty overrides. Missing student entries use the quiz session default question selection.
 - `sectionId`: Used to locate student records under `classSections`.
 
 ### App Access

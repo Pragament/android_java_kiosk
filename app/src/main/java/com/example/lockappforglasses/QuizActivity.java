@@ -70,6 +70,8 @@ public class QuizActivity extends AppCompatActivity {
     private boolean questionBankListMode = false;
     private String questionBankListId = "";
     private String questionBankListName = "";
+    private Map<String, Integer> randomQuestionTypeCounts = new HashMap<>();
+    private String studentDifficultyLevel = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -122,7 +124,10 @@ public class QuizActivity extends AppCompatActivity {
         });
 
         showLoggedInStudent();
-        questionBankListId = ((MyApp) getApplicationContext()).getCurrentQuestionBankListId();
+        MyApp app = (MyApp) getApplicationContext();
+        questionBankListId = app.getCurrentQuestionBankListId();
+        randomQuestionTypeCounts = app.getCurrentRandomQuestionTypeCounts();
+        studentDifficultyLevel = app.getCurrentStudentDifficultyLevel();
         questionBankListMode = !TextUtils.isEmpty(questionBankListId);
         if (questionBankListMode) {
             showQuestionBankListSetup();
@@ -388,11 +393,61 @@ public class QuizActivity extends AppCompatActivity {
         quizQuestions.clear();
         answers.clear();
         quizQuestions.addAll(allPublishedQuestions);
+        applyStudentDifficultyLevel(quizQuestions);
+        applyRandomQuestionTypeCounts(quizQuestions);
         if (quizQuestions.isEmpty()) {
             Toast.makeText(this, "Assigned quiz has no questions", Toast.LENGTH_SHORT).show();
             return;
         }
+        Collections.shuffle(quizQuestions);
         beginQuiz();
+    }
+
+    private void applyStudentDifficultyLevel(List<Question> questions) {
+        if (TextUtils.isEmpty(studentDifficultyLevel)) {
+            return;
+        }
+
+        ArrayList<Question> filteredQuestions = new ArrayList<>();
+        for (Question question : questions) {
+            if (studentDifficultyLevel.equals(question.difficulty)) {
+                filteredQuestions.add(question);
+            }
+        }
+        questions.clear();
+        questions.addAll(filteredQuestions);
+    }
+
+    private void applyRandomQuestionTypeCounts(List<Question> questions) {
+        if (randomQuestionTypeCounts == null || randomQuestionTypeCounts.isEmpty()) {
+            return;
+        }
+
+        ArrayList<Question> selectedQuestions = new ArrayList<>();
+        HashSet<String> configuredTypes = new HashSet<>(randomQuestionTypeCounts.keySet());
+        for (Map.Entry<String, Integer> entry : randomQuestionTypeCounts.entrySet()) {
+            String type = entry.getKey();
+            int limit = entry.getValue() == null ? 0 : entry.getValue();
+            ArrayList<Question> candidates = new ArrayList<>();
+            for (Question question : questions) {
+                if (type.equals(question.type)) {
+                    candidates.add(question);
+                }
+            }
+            Collections.shuffle(candidates);
+            for (int i = 0; i < candidates.size() && i < limit; i++) {
+                selectedQuestions.add(candidates.get(i));
+            }
+        }
+
+        for (Question question : questions) {
+            if (!configuredTypes.contains(question.type)) {
+                selectedQuestions.add(question);
+            }
+        }
+
+        questions.clear();
+        questions.addAll(selectedQuestions);
     }
 
     private void beginQuiz() {

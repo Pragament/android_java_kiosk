@@ -47,6 +47,8 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QuerySnapshot;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 
@@ -65,6 +67,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private static final String CLASS_ENABLED_FIELD = "classEnabled";
     private static final String QUIZ_MODE_ENABLED_FIELD = "quizModeEnabled";
     private static final String QUESTION_BANK_LIST_ID_FIELD = "questionBankListId";
+    private static final String RANDOM_QUESTION_TYPE_COUNTS_FIELD = "randomQuestionTypeCounts";
+    private static final String STUDENT_DIFFICULTY_LEVELS_FIELD = "studentDifficultyLevels";
     private static final String CLASS_SECTIONS_COLLECTION = "classSections";
     private static final String SECTION_ID_FIELD = "sectionId";
     private static final String STUDENTS_COLLECTION = "students";
@@ -439,6 +443,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         String sectionId = classroom.getString(SECTION_ID_FIELD);
         boolean quizModeEnabled = Boolean.TRUE.equals(classroom.getBoolean(QUIZ_MODE_ENABLED_FIELD));
         String questionBankListId = classroom.getString(QUESTION_BANK_LIST_ID_FIELD);
+        Map<String, Integer> randomQuestionTypeCounts = getRandomQuestionTypeCounts(classroom);
+        Map<String, String> studentDifficultyLevels = getStudentDifficultyLevels(classroom);
         if (TextUtils.isEmpty(sectionId)) {
             Log.w(TAG, "authenticateStudent: classroom has no sectionId, classroomId=" + classroomId);
             etAdmissionNo.setError("Unable to verify student section");
@@ -455,9 +461,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .get()
                 .addOnSuccessListener(student -> {
                     if (student.exists()) {
-                        verifyStudentPhone(classroomId, sectionId, quizModeEnabled, questionBankListId, student, phone, dialog, etPhone, tvPhoneHint);
+                        verifyStudentPhone(classroomId, sectionId, quizModeEnabled, questionBankListId, randomQuestionTypeCounts, studentDifficultyLevels, student, phone, dialog, etPhone, tvPhoneHint);
                     } else {
-                        authenticateStudentByAdmissionField(classroomId, sectionId, quizModeEnabled, questionBankListId, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, false);
+                        authenticateStudentByAdmissionField(classroomId, sectionId, quizModeEnabled, questionBankListId, randomQuestionTypeCounts, studentDifficultyLevels, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, false);
                     }
                 })
                 .addOnFailureListener(e -> handleStudentLookupFailure(etAdmissionNo, e));
@@ -468,6 +474,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             String sectionId,
             boolean quizModeEnabled,
             String questionBankListId,
+            Map<String, Integer> randomQuestionTypeCounts,
+            Map<String, String> studentDifficultyLevels,
             String admissionNo,
             String phone,
             androidx.appcompat.app.AlertDialog dialog,
@@ -494,9 +502,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
                     if (!querySnapshot.isEmpty()) {
-                        verifyStudentPhone(classroomId, sectionId, quizModeEnabled, questionBankListId, querySnapshot.getDocuments().get(0), phone, dialog, etPhone, tvPhoneHint);
+                        verifyStudentPhone(classroomId, sectionId, quizModeEnabled, questionBankListId, randomQuestionTypeCounts, studentDifficultyLevels, querySnapshot.getDocuments().get(0), phone, dialog, etPhone, tvPhoneHint);
                     } else if (!numericQuery && TextUtils.isDigitsOnly(admissionNo)) {
-                        authenticateStudentByAdmissionField(classroomId, sectionId, quizModeEnabled, questionBankListId, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, true);
+                        authenticateStudentByAdmissionField(classroomId, sectionId, quizModeEnabled, questionBankListId, randomQuestionTypeCounts, studentDifficultyLevels, admissionNo, phone, dialog, etAdmissionNo, etPhone, tvPhoneHint, true);
                     } else {
                         Log.w(TAG, "authenticateStudentByAdmissionField: no student found for admissionNo=" + admissionNo);
                         etAdmissionNo.setError("Invalid admission number");
@@ -510,6 +518,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             String sectionId,
             boolean quizModeEnabled,
             String questionBankListId,
+            Map<String, Integer> randomQuestionTypeCounts,
+            Map<String, String> studentDifficultyLevels,
             DocumentSnapshot student,
             String phone,
             androidx.appcompat.app.AlertDialog dialog,
@@ -531,12 +541,69 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 sectionId,
                 getStudentAdmissionNo(student),
                 student.getString("name"));
+        ((MyApp) getApplicationContext()).setCurrentQuizSessionOptions(randomQuestionTypeCounts, studentDifficultyLevels);
         onClassCodeVerified(classroomId, dialog, quizModeEnabled, questionBankListId);
     }
 
+    private Map<String, Integer> getRandomQuestionTypeCounts(DocumentSnapshot classroom) {
+        Map<String, Integer> counts = new HashMap<>();
+        Object rawCounts = classroom.get(RANDOM_QUESTION_TYPE_COUNTS_FIELD);
+        if (!(rawCounts instanceof Map)) {
+            return counts;
+        }
+
+        Map<?, ?> rawMap = (Map<?, ?>) rawCounts;
+        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+            if (entry.getKey() == null) {
+                continue;
+            }
+            Integer count = parseNonNegativeInteger(entry.getValue());
+            if (count != null) {
+                counts.put(entry.getKey().toString(), count);
+            }
+        }
+        return counts;
+    }
+
+    private Integer parseNonNegativeInteger(Object value) {
+        if (value instanceof Number) {
+            return Math.max(0, ((Number) value).intValue());
+        }
+        if (value instanceof String && TextUtils.isDigitsOnly((String) value)) {
+            return Integer.parseInt((String) value);
+        }
+        return null;
+    }
+
+    private Map<String, String> getStudentDifficultyLevels(DocumentSnapshot classroom) {
+        Map<String, String> levels = new HashMap<>();
+        Object rawLevels = classroom.get(STUDENT_DIFFICULTY_LEVELS_FIELD);
+        if (!(rawLevels instanceof Map)) {
+            return levels;
+        }
+
+        Map<?, ?> rawMap = (Map<?, ?>) rawLevels;
+        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+            if (entry.getKey() == null || entry.getValue() == null) {
+                continue;
+            }
+            String difficulty = entry.getValue().toString().trim();
+            if (!TextUtils.isEmpty(difficulty)) {
+                levels.put(entry.getKey().toString(), difficulty);
+            }
+        }
+        return levels;
+    }
+
     private String getStudentAdmissionNo(DocumentSnapshot student) {
-        String admissionNo = student.getString(ADMISSION_NO_FIELD);
-        return TextUtils.isEmpty(admissionNo) ? student.getId() : admissionNo;
+        Object admissionNo = student.get(ADMISSION_NO_FIELD);
+        if (admissionNo instanceof Number) {
+            return String.valueOf(((Number) admissionNo).longValue());
+        }
+        if (admissionNo != null && !TextUtils.isEmpty(admissionNo.toString())) {
+            return admissionNo.toString();
+        }
+        return student.getId();
     }
 
     private void openQuizActivity() {
