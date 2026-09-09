@@ -1,6 +1,9 @@
 package com.example.lockappforglasses;
 
 import android.app.Application;
+import android.content.Context;
+
+import androidx.multidex.MultiDex;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,6 +18,12 @@ public class MyApp extends Application {
     private String currentQuestionBankListId = null;
     private Map<String, Integer> currentRandomQuestionTypeCounts = new HashMap<>();
     private Map<String, String> currentStudentDifficultyLevels = new HashMap<>();
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(base);
+        MultiDex.install(this);
+    }
 
     @Override
     public void onCreate() {

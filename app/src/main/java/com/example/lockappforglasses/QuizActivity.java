@@ -510,22 +510,22 @@ public class QuizActivity extends AppCompatActivity {
         RadioButton trueButton = new RadioButton(this);
         trueButton.setText("True");
         trueButton.setTextColor(getResources().getColor(R.color.black));
-        trueButton.setId(1);
+        trueButton.setId(View.generateViewId());
         radioGroup.addView(trueButton);
 
         RadioButton falseButton = new RadioButton(this);
         falseButton.setText("False");
         falseButton.setTextColor(getResources().getColor(R.color.black));
-        falseButton.setId(2);
+        falseButton.setId(View.generateViewId());
         radioGroup.addView(falseButton);
 
         if (previous != null && previous.trueFalseAnswer != null) {
-            radioGroup.check(previous.trueFalseAnswer ? 1 : 2);
+            radioGroup.check(previous.trueFalseAnswer ? trueButton.getId() : falseButton.getId());
         }
 
         radioGroup.setOnCheckedChangeListener((group, checkedId) -> {
             Answer answer = getOrCreateAnswer(question);
-            answer.trueFalseAnswer = checkedId == 1;
+            answer.trueFalseAnswer = checkedId == trueButton.getId();
             answer.displayAnswer = answer.trueFalseAnswer ? "True" : "False";
         });
         llAnswerArea.addView(radioGroup);
