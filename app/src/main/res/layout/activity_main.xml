@@ -81,6 +81,16 @@
     </LinearLayout>
 
     <TextView
+        android:id="@+id/txtAppVersion"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingBottom="4dp"
+        android:textColor="@color/black"
+        android:textSize="12sp"
+        tools:text="Version 1.0" />
+
+    <TextView
         android:id="@+id/txtWhitelistedAppsTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

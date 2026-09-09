@@ -9,6 +9,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -112,6 +113,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         whitelistedWebsitesScrollView = findViewById(R.id.whitelistedWebsitesScrollView);
         txtWhitelistedAppsTitle = findViewById(R.id.txtWhitelistedAppsTitle);
         txtWhitelistedWebsitesTitle = findViewById(R.id.txtWhitelistedWebsitesTitle);
+        TextView txtAppVersion = findViewById(R.id.txtAppVersion);
+        txtAppVersion.setText("Version " + getAppVersionName());
         txtWhitelistedAppsTitle.setOnClickListener(v -> toggleWhitelistedApps());
         txtWhitelistedWebsitesTitle.setOnClickListener(v -> toggleWhitelistedWebsites());
         buttonQuiz.setOnClickListener(v -> openQuizActivity());
@@ -180,6 +183,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             }
         });
         Spinner websiteSpinner = (Spinner) findViewById(R.id.websiteSpinner);
+        websiteSpinner.setVisibility(View.GONE);
         websiteSpinner.setOnItemSelectedListener(this);
         view = getWindow().getDecorView();
 
@@ -218,6 +222,16 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        }
+    }
+
+    private String getAppVersionName() {
+        try {
+            PackageInfo packageInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+            return packageInfo.versionName;
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "Unable to read app version name", e);
+            return "";
         }
     }
 
